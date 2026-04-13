@@ -1,0 +1,11 @@
+{
+  "amp.mcpServers": {
+    "backlog": {
+      "command": "backlog",
+      "args": ["mcp", "start"],
+      "env": {
+        "BACKLOG_CWD": "d:/projects/storage-bridge"
+      }
+    }
+  }
+}
