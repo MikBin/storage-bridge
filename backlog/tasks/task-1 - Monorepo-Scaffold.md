@@ -8,7 +8,7 @@ updated_date: '2026-04-13 15:47'
 labels: []
 dependencies: []
 references:
-  - settings-store-architecture.md
+  - docs/settings-store-architecture.md
 priority: high
 ---
 

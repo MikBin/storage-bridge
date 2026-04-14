@@ -10,7 +10,7 @@ dependencies:
   - TASK-12
   - TASK-13
 references:
-  - settings-store-architecture.md
+  - docs/settings-store-architecture.md
 priority: low
 ---
 

@@ -8,7 +8,7 @@ labels: []
 dependencies:
   - TASK-4
 references:
-  - settings-store-architecture.md
+  - docs/settings-store-architecture.md
 priority: medium
 ---
 

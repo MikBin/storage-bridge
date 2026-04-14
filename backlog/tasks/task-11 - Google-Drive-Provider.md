@@ -9,7 +9,7 @@ dependencies:
   - TASK-3
   - TASK-9
 references:
-  - settings-store-architecture.md
+  - docs/settings-store-architecture.md
 priority: high
 ---
 

@@ -40,7 +40,7 @@ const prefs = await store.get('preferences');
 
 ## Architecture
 
-See [settings-store-architecture.md](./settings-store-architecture.md) for the full design — public API, provider port, error model, auth abstraction, and monorepo structure.
+See [settings-store-architecture.md](./docs/settings-store-architecture.md) for the full design — public API, provider port, error model, auth abstraction, and monorepo structure.
 
 ## License
 
