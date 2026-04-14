@@ -42,6 +42,25 @@ importers:
         specifier: latest
         version: 8.58.2(eslint@10.2.0)(typescript@6.0.2)
 
+  packages/testing:
+    dependencies:
+      '@storage-bridge/core':
+        specifier: workspace:*
+        version: link:../core
+    devDependencies:
+      '@storage-bridge/eslint-config':
+        specifier: workspace:*
+        version: link:../eslint-config
+      '@storage-bridge/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
+      typescript:
+        specifier: latest
+        version: 6.0.2
+      vitest:
+        specifier: latest
+        version: 4.1.4(vite@8.0.8)
+
   packages/typescript-config: {}
 
 packages:
