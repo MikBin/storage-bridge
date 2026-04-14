@@ -63,6 +63,58 @@ These thoughts mean you're rationalizing:
 
 User's explicit instructions always take precedence over skill instructions.
 
+<!-- JULES MCP GUIDELINES START -->
+
+## Jules MCP Orchestrator Mode
+
+This project can use the jules-mcp server in orchestrator mode where a local agent coordinates work with Jules as a remote coding assistant.
+
+### Overview
+
+Jules is an advanced developer agent. Simply specify the task clearly and concisely - no need to provide code snippets or implementation details. Jules will analyze the codebase, plan the work, and execute it independently.
+
+### Orchestrator Workflow
+
+When delegating work to Jules, follow this sequential workflow:
+
+1. **Pull Latest Changes** — `git pull origin <branch>` before creating any session
+2. **Create Jules Session** — Use `jules_create_session` with:
+   - `owner`, `repo`, `branch` (required — **must be the default branch `main`/`master`**, Jules creates its own feature branch)
+   - `prompt` (required — clear task description)
+   - `title`, `requirePlanApproval`, `automationMode` (`"AUTO_CREATE_PR"`) (optional)
+3. **Monitor Session** — Use `jules_wait` (recommended: 120s intervals) + `jules_check_jules` for compact polling (`Q/C/F/N`). Only use `jules_get_session` after an actionable signal. Handle states:
+   - `AWAITING_PLAN_APPROVAL` → `jules_approve_plan`
+   - `AWAITING_USER_FEEDBACK` → `jules_send_message`
+   - `IN_PROGRESS` → continue monitoring
+   - `COMPLETED` / `FAILED` → proceed
+4. **Extract PR** — `jules_extract_pr_from_session` to get PR URL and details
+5. **Merge PR** — `merge_pull_request` (squash recommended)
+6. **Delete Branch** — Clean up the merged branch
+7. **Pull Changes Locally** — `git pull origin <branch>`
+
+**Important:** Sessions must be processed sequentially. Complete the full workflow before starting the next session.
+
+### Jules MCP Tools Reference
+
+| Tool | Description |
+|------|-------------|
+| `jules_create_session` | Create a new Jules coding session for a GitHub repository |
+| `jules_get_session` | Fetch session metadata, state, and outputs |
+| `jules_check_jules` | Minimal polling check returning `Q`, `C`, `F`, or `N` |
+| `jules_list_sessions` | List all Jules sessions |
+| `jules_delete_session` | Delete a Jules session |
+| `jules_approve_plan` | Approve the plan for a session awaiting approval |
+| `jules_send_message` | Send a clarification or instruction to a session |
+| `jules_list_activities` | List activities for a Jules session |
+| `jules_get_activity` | Get a single activity by ID |
+| `jules_monitor_session` | Poll a session until completion with progress notifications |
+| `jules_wait` | Pause execution for a given number of seconds (max 600) |
+| `jules_list_sources` | List available GitHub repositories |
+| `jules_get_source` | Get details for a specific source |
+| `jules_extract_pr_from_session` | Extract PR information from completed session outputs |
+
+<!-- JULES MCP GUIDELINES END -->
+
 <!-- BACKLOG.MD MCP GUIDELINES START -->
 
 <CRITICAL_INSTRUCTION>
