@@ -15,7 +15,7 @@ priority: high
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-Initialize the npm monorepo with Turborepo build orchestration. Root package.json with workspaces defining packages/*, apps/*, examples/*. tsconfig.base.json with shared compiler options (strict, ES2022, moduleResolution bundler). turbo.json with build, test, lint, typecheck pipelines. packages/eslint-config/index.js with shared lint config.
+Initialize the pnpm monorepo with Turborepo build orchestration. Root package.json with workspaces defining packages/*, apps/*, examples/*. tsconfig.base.json with shared compiler options (strict, ES2022, moduleResolution bundler). turbo.json with build, test, lint, typecheck pipelines. packages/eslint-config/index.js with shared lint config.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
@@ -25,5 +25,5 @@ Initialize the npm monorepo with Turborepo build orchestration. Root package.jso
 - [ ] #3 turbo.json with build, test, lint, typecheck pipelines
 - [ ] #4 .gitignore updated for node_modules, dist, turbo cache
 - [ ] #5 packages/eslint-config/index.js with shared lint config
-- [ ] #6 npm install and turbo build run cleanly
+- [ ] #6 pnpm install and turbo build run cleanly
 <!-- AC:END -->
