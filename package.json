@@ -1,0 +1,19 @@
+{
+  "name": "storage-bridge",
+  "private": true,
+  "engines": {
+    "node": ">= 18"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "dev": "turbo run dev"
+  },
+  "devDependencies": {
+    "turbo": "latest",
+    "typescript": "latest"
+  },
+  "packageManager": "pnpm@10.30.3"
+}
