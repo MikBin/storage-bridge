@@ -1,9 +1,10 @@
 ---
 id: TASK-7
 title: Local Provider
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-04-13 15:41'
+updated_date: '2026-04-14 17:16'
 labels: []
 dependencies:
   - TASK-3
