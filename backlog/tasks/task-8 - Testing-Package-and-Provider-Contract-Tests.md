@@ -1,9 +1,10 @@
 ---
 id: TASK-8
 title: Testing Package and Provider Contract Tests
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-04-13 15:41'
+updated_date: '2026-04-14 15:45'
 labels: []
 dependencies:
   - TASK-2
@@ -20,9 +21,15 @@ Create packages/testing with reusable test utilities and a provider conformance 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 src/fixtures.ts with factory functions for SettingsEnvelope, SettingsSummary, ConnectedProfile
-- [ ] #2 src/fake-provider.ts with simple in-memory DocumentStoreProvider
-- [ ] #3 src/provider-contract-tests.ts with exported conformance test suite
-- [ ] #4 Contract tests validate: connect/disconnect, put/get round-trip, list, delete, null on missing, revision updates
-- [ ] #5 Package builds cleanly
+- [x] #1 src/fixtures.ts with factory functions for SettingsEnvelope, SettingsSummary, ConnectedProfile
+- [x] #2 src/fake-provider.ts with simple in-memory DocumentStoreProvider
+- [x] #3 src/provider-contract-tests.ts with exported conformance test suite
+- [x] #4 Contract tests validate: connect/disconnect, put/get round-trip, list, delete, null on missing, revision updates
+- [x] #5 Package builds cleanly
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Implemented via Jules session. PR #3 merged (squash) as e85c17f. Delivered packages/testing with fixtures, fake-provider, and provider-contract-tests.
+<!-- SECTION:FINAL_SUMMARY:END -->
