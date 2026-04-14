@@ -1,10 +1,10 @@
 ---
 id: TASK-1
 title: Monorepo Scaffold
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-04-13 15:40'
-updated_date: '2026-04-13 15:47'
+updated_date: '2026-04-14 09:10'
 labels: []
 dependencies: []
 references:
