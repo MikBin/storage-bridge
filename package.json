@@ -12,6 +12,7 @@
     "dev": "turbo run dev"
   },
   "devDependencies": {
+    "happy-dom": "^20.9.0",
     "turbo": "latest",
     "typescript": "latest"
   },

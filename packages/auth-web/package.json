@@ -1,0 +1,30 @@
+{
+  "name": "@storage-bridge/auth-web",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "lint": "eslint src/",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@storage-bridge/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@storage-bridge/eslint-config": "workspace:*",
+    "@storage-bridge/typescript-config": "workspace:*",
+    "typescript": "latest",
+    "vitest": "latest"
+  }
+}
