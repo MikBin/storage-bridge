@@ -141,3 +141,6 @@ vite.config.ts.timestamp-*
 # Superpowers
 .worktrees/
 .superpowers/
+
+# Turborepo
+.turbo/
