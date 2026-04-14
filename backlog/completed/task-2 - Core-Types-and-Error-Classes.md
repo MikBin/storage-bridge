@@ -1,7 +1,7 @@
 ---
 id: TASK-2
 title: Core Types and Error Classes
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-04-13 15:40'
 labels: []
@@ -20,9 +20,9 @@ Create packages/core with shared type definitions and error hierarchy. src/types
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 src/types.ts exports all public types
-- [ ] #2 src/errors.ts exports full error hierarchy
-- [ ] #3 src/index.ts re-exports all public types and errors
-- [ ] #4 Unit tests for error construction and instanceof checks
-- [ ] #5 Package builds cleanly
+- [x] #1 src/types.ts exports all public types
+- [x] #2 src/errors.ts exports full error hierarchy
+- [x] #3 src/index.ts re-exports all public types and errors
+- [x] #4 Unit tests for error construction and instanceof checks
+- [x] #5 Package builds cleanly
 <!-- AC:END -->
