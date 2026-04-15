@@ -92,6 +92,31 @@ importers:
         specifier: latest
         version: 8.58.2(eslint@10.2.0)(typescript@6.0.2)
 
+  packages/provider-google-drive:
+    dependencies:
+      '@storage-bridge/core':
+        specifier: workspace:*
+        version: link:../core
+    devDependencies:
+      '@storage-bridge/auth-web':
+        specifier: workspace:*
+        version: link:../auth-web
+      '@storage-bridge/eslint-config':
+        specifier: workspace:*
+        version: link:../eslint-config
+      '@storage-bridge/testing':
+        specifier: workspace:*
+        version: link:../testing
+      '@storage-bridge/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
+      typescript:
+        specifier: latest
+        version: 6.0.2
+      vitest:
+        specifier: latest
+        version: 4.1.4(@types/node@25.6.0)(happy-dom@20.9.0)(vite@8.0.8(@types/node@25.6.0)(terser@5.46.1)(yaml@2.8.3))
+
   packages/testing:
     dependencies:
       '@storage-bridge/core':

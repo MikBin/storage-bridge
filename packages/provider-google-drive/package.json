@@ -1,0 +1,34 @@
+{
+  "name": "@storage-bridge/provider-google-drive",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "lint": "eslint src/",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@storage-bridge/core": "workspace:*"
+  },
+  "peerDependencies": {
+    "@storage-bridge/auth-web": "workspace:*"
+  },
+  "devDependencies": {
+    "@storage-bridge/auth-web": "workspace:*",
+    "@storage-bridge/eslint-config": "workspace:*",
+    "@storage-bridge/testing": "workspace:*",
+    "@storage-bridge/typescript-config": "workspace:*",
+    "typescript": "latest",
+    "vitest": "latest"
+  }
+}
