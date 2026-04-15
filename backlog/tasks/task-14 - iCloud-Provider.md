@@ -1,9 +1,10 @@
 ---
 id: TASK-14
 title: iCloud Provider
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-04-13 15:43'
+updated_date: '2026-04-15 17:34'
 labels: []
 dependencies:
   - TASK-3
