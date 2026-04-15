@@ -117,6 +117,28 @@ importers:
         specifier: latest
         version: 4.1.4(@types/node@25.6.0)(happy-dom@20.9.0)(vite@8.0.8(@types/node@25.6.0)(terser@5.46.1)(yaml@2.8.3))
 
+  packages/provider-icloud:
+    dependencies:
+      '@storage-bridge/core':
+        specifier: workspace:*
+        version: link:../core
+    devDependencies:
+      '@storage-bridge/eslint-config':
+        specifier: workspace:*
+        version: link:../eslint-config
+      '@storage-bridge/testing':
+        specifier: workspace:*
+        version: link:../testing
+      '@storage-bridge/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
+      typescript:
+        specifier: latest
+        version: 6.0.2
+      vitest:
+        specifier: latest
+        version: 4.1.4(@types/node@25.6.0)(happy-dom@20.9.0)(vite@8.0.8(@types/node@25.6.0)(terser@5.46.1)(yaml@2.8.3))
+
   packages/provider-onedrive:
     dependencies:
       '@storage-bridge/core':
