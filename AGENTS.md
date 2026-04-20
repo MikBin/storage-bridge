@@ -23,6 +23,39 @@ Before taking any action, check if a relevant skill exists. If a skill might app
 - DRY (Don't Repeat Yourself)
 - TDD (Test-Driven Development) — write tests first, always
 
+## Code Style Guidelines
+
+To maintain clean, modular, and testable code, adhere to the following principles:
+
+### Pure Functions
+- Prioritize pure functions that produce consistent outputs for given inputs without side effects.
+- Avoid modifying external state or relying on mutable data within functions.
+- Pure functions enable easier testing, debugging, and reasoning about code behavior.
+
+### SOLID Principles
+- **Single Responsibility**: Each function or class should have one reason to change.
+- **Open/Closed**: Code should be open for extension but closed for modification.
+- **Liskov Substitution**: Subtypes should be substitutable for their base types.
+- **Interface Segregation**: Clients should not be forced to depend on interfaces they don't use.
+- **Dependency Inversion**: Depend on abstractions, not concretions.
+
+### Function Declaration and Usage
+- Avoid declaring functions inside the body of other functions (closures) to prevent scope pollution and improve readability.
+- Refrain from using inline arrow functions in array methods (map, reduce, filter, etc.) unless the function is very simple (one-liner).
+- Instead, define separate named functions for use in higher-order functions. This promotes modularity, reusability, and easier unit testing.
+
+Example of preferred style:
+```javascript
+// Avoid: Inline arrow function in map
+const result = array.map(item => item * 2);
+
+// Prefer: Separate function for clarity and testability
+const double = item => item * 2;
+const result = array.map(double);
+```
+
+This approach enhances code maintainability and allows for isolated testing of individual functions.
+
 ### Available Skills
 
 | Skill | When to Use |
