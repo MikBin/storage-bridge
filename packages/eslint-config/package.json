@@ -6,5 +6,8 @@
     "@eslint/js": "latest",
     "eslint": "latest",
     "typescript-eslint": "latest"
+  },
+  "devDependencies": {
+    "@vitest/coverage-v8": "3.2.4"
   }
 }
