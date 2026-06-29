@@ -12,6 +12,8 @@
     "dev": "turbo run dev"
   },
   "devDependencies": {
+    "@vitest/coverage-v8": "4.1.4",
+    "fast-check": "^4.8.0",
     "turbo": "latest",
     "typescript": "latest"
   },
