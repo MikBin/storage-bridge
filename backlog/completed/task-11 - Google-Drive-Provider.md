@@ -4,7 +4,7 @@ title: Google Drive Provider
 status: Done
 assignee: []
 created_date: '2026-04-13 15:42'
-updated_date: '2026-04-15 16:56'
+updated_date: '2026-06-29 23:59'
 labels: []
 dependencies:
   - TASK-3
@@ -24,13 +24,13 @@ Implement packages/provider-google-drive extending FileBackedDocumentProvider. T
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Extends FileBackedDocumentProvider
-- [ ] #2 Uses appDataFolder with drive.appdata scope
-- [ ] #3 Multipart upload for create, PATCH for update
-- [ ] #4 Delegates auth to injected OAuthClient
-- [ ] #5 google-drive-mapper.ts maps API responses to FileEntry
-- [ ] #6 Passes provider contract tests
-- [ ] #7 Unit tests with mocked fetch
+- [x] #1 Extends FileBackedDocumentProvider
+- [x] #2 Uses appDataFolder with drive.appdata scope
+- [x] #3 Multipart upload for create, PATCH for update
+- [x] #4 Delegates auth to injected OAuthClient
+- [x] #5 google-drive-mapper.ts maps API responses to FileEntry
+- [x] #6 Passes provider contract tests
+- [x] #7 Unit tests with mocked fetch
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -49,3 +49,10 @@ Implement packages/provider-google-drive extending FileBackedDocumentProvider. T
 7. **Contract Tests** — describeProviderContract against mock
 8. **Barrel Export + Verification** — index.ts, full test suite, typecheck
 <!-- SECTION:PLAN:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Implemented via commit `29826bc`. Completed Google Drive provider package that extends FileBackedDocumentProvider, targets the appDataFolder with drive.appdata scope, performs multipart upload/PATCH, delegates auth, and maps responses properly. Conformance contract tests and unit tests with mocked fetch are fully green.
+<!-- SECTION:FINAL_SUMMARY:END -->
+

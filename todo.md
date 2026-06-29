@@ -3,8 +3,8 @@
 This file tracks the outstanding tasks required to bring the Storage Bridge project to a production-ready state.
 
 ## 1. Backlog Synchronization
-- [ ] Update status to `Done` in backlog task files
-- [ ] Move completed tasks from [tasks](file:///c:/Users/miche/Documents/projects/storage-bridge/backlog/tasks) to [completed](file:///c:/Users/miche/Documents/projects/storage-bridge/backlog/completed)
+- [x] Update status to `Done` in backlog task files
+- [x] Move completed tasks from [tasks](file:///c:/Users/miche/Documents/projects/storage-bridge/backlog/tasks) to [completed](file:///c:/Users/miche/Documents/projects/storage-bridge/backlog/completed)
   - Tasks: 3, 5, 6, 8, 9, 10, 11, 12, 13, 14
 
 ## 2. Missing Features & Documentation
