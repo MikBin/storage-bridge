@@ -13,12 +13,12 @@ class InMemoryFileProvider extends FileBackedDocumentProvider {
   async isConnected(): Promise<boolean> { return true; }
   async getProfile(): Promise<ConnectedProfile | null> { return { provider: this.id }; }
 
-  protected async readFile(fileName: string): Promise<{ text: string; meta: FileEntry } | null> {
+  public async readFile(fileName: string): Promise<{ text: string; meta: FileEntry } | null> {
     const entry = this.store.get(fileName);
     return entry ?? null;
   }
 
-  protected async writeFile(fileName: string, text: string, _options?: PutOptions): Promise<FileEntry> {
+  public async writeFile(fileName: string, text: string, _options?: PutOptions): Promise<FileEntry> {
     const existing = this.store.get(fileName);
     this.revCounter++;
     const meta: FileEntry = {
@@ -33,11 +33,11 @@ class InMemoryFileProvider extends FileBackedDocumentProvider {
     return meta;
   }
 
-  protected async removeFile(fileName: string): Promise<void> {
+  public async removeFile(fileName: string): Promise<void> {
     this.store.delete(fileName);
   }
 
-  protected async listFiles(): Promise<FileEntry[]> {
+  public async listFiles(): Promise<FileEntry[]> {
     return Array.from(this.store.values()).map(e => e.meta);
   }
 }

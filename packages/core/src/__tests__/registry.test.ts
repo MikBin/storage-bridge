@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DefaultSettingsStore } from '../manager.js';
 import { ProviderRegistry, createSettingsStore } from '../registry.js';
-import type { ProviderDescriptor } from '../types.js';
+import type { ProviderDescriptor, DocumentStoreProvider } from '../types.js';
 
 describe('ProviderRegistry', () => {
   it('should initialize empty map if no descriptors provided', () => {
@@ -15,7 +15,7 @@ describe('ProviderRegistry', () => {
       label: 'Local Storage',
       capabilities: ['web'],
       isSupported: async () => true,
-      create: () => ({} as any),
+      create: () => ({} as unknown as DocumentStoreProvider),
     };
 
     const registry = new ProviderRegistry([mockDescriptor]);
@@ -29,7 +29,7 @@ describe('ProviderRegistry', () => {
       label: 'Local Storage',
       capabilities: ['web'],
       isSupported: async () => true,
-      create: () => ({} as any),
+      create: () => ({} as unknown as DocumentStoreProvider),
     };
 
     const registry = new ProviderRegistry();
@@ -45,7 +45,7 @@ describe('ProviderRegistry', () => {
       label: 'Local Storage 1',
       capabilities: ['web'],
       isSupported: async () => true,
-      create: () => ({} as any),
+      create: () => ({} as unknown as DocumentStoreProvider),
     };
 
     const mockDescriptor2: ProviderDescriptor = {
@@ -53,7 +53,7 @@ describe('ProviderRegistry', () => {
       label: 'Local Storage 2',
       capabilities: ['web'],
       isSupported: async () => true,
-      create: () => ({} as any),
+      create: () => ({} as unknown as DocumentStoreProvider),
     };
 
     const registry = new ProviderRegistry([mockDescriptor1]);
@@ -71,7 +71,7 @@ describe('createSettingsStore', () => {
       label: 'Local Storage',
       capabilities: ['web'],
       isSupported: async () => true,
-      create: () => ({} as any),
+      create: () => ({} as unknown as DocumentStoreProvider),
     };
 
     const store = createSettingsStore([mockDescriptor]);

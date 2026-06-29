@@ -15,7 +15,7 @@ import type {
 class FakeIntegrationProvider implements DocumentStoreProvider {
   public readonly id: ProviderId = 'local';
   private connected = false;
-  private documents = new Map<string, SettingsEnvelope<any>>();
+  private documents = new Map<string, SettingsEnvelope<unknown>>();
   private revisionCounters = new Map<string, number>();
 
   async connect(): Promise<void> {

@@ -8,6 +8,10 @@ export interface CloudKitConfig {
   fetchFn?: typeof fetch;
 }
 
+export interface CloudKitResponse {
+  records?: (CloudKitRecord & { serverErrorCode?: string; reason?: string })[];
+}
+
 export class CloudKitClient {
   private readonly baseUrl: string;
   private readonly fetchFn: typeof fetch;
@@ -23,8 +27,7 @@ export class CloudKitClient {
     this.baseUrl = `https://api.apple-cloudkit.com/database/1/${config.containerId}/${environment}/private`;
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private async request(endpoint: string, body: any): Promise<any> {
+  private async request(endpoint: string, body: unknown): Promise<CloudKitResponse> {
     const url = `${this.baseUrl}${endpoint}?ckAPIToken=${this.apiToken}`;
 
     const response = await this.fetchFn(url, {
@@ -109,7 +112,6 @@ export class CloudKitClient {
       }
     });
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (data.records || []).filter((r: any) => !r.serverErrorCode);
+    return (data.records || []).filter((r: CloudKitRecord & { serverErrorCode?: string }) => !r.serverErrorCode);
   }
 }

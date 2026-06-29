@@ -17,8 +17,8 @@ export class ICloudProvider extends RecordBackedDocumentProvider {
         return true;
       }
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const userAgent = (globalThis as any).navigator?.userAgent || '';
+      const nav = (globalThis as typeof globalThis & { navigator?: { userAgent?: string } }).navigator;
+      const userAgent = nav?.userAgent || '';
       if (/Mac OS X|iPhone|iPad|iPod/.test(userAgent)) {
          return true;
       }

@@ -1,8 +1,7 @@
 import type { CloudRecord } from '@storage-bridge/core';
 
 export interface CloudKitField {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  value: any;
+  value: unknown;
 }
 
 export interface CloudKitRecord {
@@ -16,8 +15,7 @@ export interface CloudKitRecord {
 }
 
 export function mapToCloudRecord(ckRecord: CloudKitRecord): CloudRecord {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const fields: Record<string, any> = {};
+  const fields: Record<string, unknown> = {};
   for (const [key, field] of Object.entries(ckRecord.fields)) {
     fields[key] = field.value;
   }

@@ -24,16 +24,16 @@ export abstract class FileBackedDocumentProvider implements DocumentStoreProvide
   abstract isConnected(): Promise<boolean>;
   abstract getProfile(): Promise<ConnectedProfile | null>;
 
-  protected abstract readFile(fileName: string): Promise<{ text: string; meta: FileEntry } | null>;
-  protected abstract writeFile(fileName: string, body: string, options?: PutOptions): Promise<FileEntry>;
-  protected abstract removeFile(fileName: string): Promise<void>;
-  protected abstract listFiles(): Promise<FileEntry[]>;
+  public abstract readFile(fileName: string): Promise<{ text: string; meta: FileEntry } | null>;
+  public abstract writeFile(fileName: string, body: string, options?: PutOptions): Promise<FileEntry>;
+  public abstract removeFile(fileName: string): Promise<void>;
+  public abstract listFiles(): Promise<FileEntry[]>;
 
-  protected keyToFileName(key: string): string {
+  public keyToFileName(key: string): string {
     return `${encodeURIComponent(key)}.json`;
   }
 
-  protected fileNameToKey(fileName: string): string {
+  public fileNameToKey(fileName: string): string {
     return decodeURIComponent(fileName.replace(/\.json$/, ''));
   }
 

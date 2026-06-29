@@ -22,10 +22,10 @@ export abstract class RecordBackedDocumentProvider implements DocumentStoreProvi
   abstract isConnected(): Promise<boolean>;
   abstract getProfile(): Promise<ConnectedProfile | null>;
 
-  protected abstract getRecord(key: string): Promise<CloudRecord | null>;
-  protected abstract saveRecord(record: CloudRecord, options?: PutOptions): Promise<CloudRecord>;
-  protected abstract removeRecord(key: string): Promise<void>;
-  protected abstract listRecords(): Promise<CloudRecord[]>;
+  public abstract getRecord(key: string): Promise<CloudRecord | null>;
+  public abstract saveRecord(record: CloudRecord, options?: PutOptions): Promise<CloudRecord>;
+  public abstract removeRecord(key: string): Promise<void>;
+  public abstract listRecords(): Promise<CloudRecord[]>;
 
   async getDocument<T>(key: string): Promise<SettingsEnvelope<T> | null> {
     const record = await this.getRecord(key);

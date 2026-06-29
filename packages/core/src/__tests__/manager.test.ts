@@ -19,7 +19,7 @@ class FakeProvider implements DocumentStoreProvider {
   public id: ProviderId = 'local';
   public isConnectedValue = false;
   public profile: ConnectedProfile | null = null;
-  public documents = new Map<string, SettingsEnvelope<any>>();
+  public documents = new Map<string, SettingsEnvelope<unknown>>();
   public connectCalled = false;
   public disconnectCalled = false;
 

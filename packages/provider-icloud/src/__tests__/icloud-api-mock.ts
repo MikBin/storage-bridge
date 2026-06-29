@@ -1,8 +1,14 @@
 import { vi } from 'vitest';
 
+export interface MockCloudKitRecord {
+  recordName: string;
+  recordType?: string;
+  recordChangeTag?: string;
+  fields: Record<string, { value: unknown }>;
+}
+
 export interface MockCloudKitState {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  records: Record<string, any>;
+  records: Record<string, MockCloudKitRecord>;
   counter: number;
 }
 
@@ -51,9 +57,16 @@ export function createCloudKitApiMock(initialState: MockCloudKitState = { record
 
       if (urlStr.includes('/records/modify')) {
         // Handle modify (save/delete)
-        const operations = body?.operations || [];
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const results = operations.map((op: any) => {
+        interface CloudKitOperation {
+          operationType: 'create' | 'update' | 'forceUpdate' | 'delete';
+          record: {
+            recordName: string;
+            recordChangeTag?: string;
+            fields?: Record<string, { value: unknown }>;
+          };
+        }
+        const operations = (body?.operations || []) as CloudKitOperation[];
+        const results = operations.map((op) => {
           const { operationType, record } = op;
           const { recordName, recordChangeTag } = record;
 
@@ -75,14 +88,14 @@ export function createCloudKitApiMock(initialState: MockCloudKitState = { record
             state.records[recordName] = {
               recordName,
               recordType: 'SettingsDocument',
-              fields: record.fields,
+              fields: record.fields || {},
               recordChangeTag: newTag
             };
 
             return {
               recordName,
               recordType: 'SettingsDocument',
-              fields: record.fields,
+              fields: record.fields || {},
               recordChangeTag: newTag,
               modified: { timestamp: new Date().getTime() },
               deleted: false

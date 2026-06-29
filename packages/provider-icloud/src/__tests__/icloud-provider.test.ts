@@ -9,9 +9,8 @@ describe('ICloudProvider', () => {
   beforeEach(() => {
     apiMock = createCloudKitApiMock();
 
-    // Set up environment so isSupported() returns true
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (globalThis as any).ApplePaySession = {};
+    const globalWithApplePay = globalThis as typeof globalThis & { ApplePaySession?: unknown };
+    globalWithApplePay.ApplePaySession = {};
 
     provider = new ICloudProvider({
       apiToken: 'test-token',
@@ -27,8 +26,8 @@ describe('ICloudProvider', () => {
     });
 
     it('returns false when Apple environment is not detected', () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      delete (globalThis as any).ApplePaySession;
+      const globalWithApplePay = globalThis as typeof globalThis & { ApplePaySession?: unknown };
+      delete globalWithApplePay.ApplePaySession;
       expect(provider.isSupported()).toBe(false);
     });
   });

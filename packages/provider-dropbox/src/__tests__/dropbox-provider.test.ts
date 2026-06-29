@@ -185,7 +185,7 @@ describe('DropboxProvider', () => {
       };
       const { mockFetch } = createDropboxApiMock();
       const provider = new DropboxProvider({ auth, fetchFn: mockFetch as typeof fetch });
-      await expect((provider as any).listFiles()).rejects.toThrow(AuthRequiredError);
+      await expect(provider.listFiles()).rejects.toThrow(AuthRequiredError);
     });
 
     it('readFile returns null for missing file', async () => {

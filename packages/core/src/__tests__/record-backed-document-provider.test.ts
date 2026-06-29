@@ -13,11 +13,11 @@ class InMemoryRecordProvider extends RecordBackedDocumentProvider {
   async isConnected(): Promise<boolean> { return true; }
   async getProfile(): Promise<ConnectedProfile | null> { return { provider: this.id }; }
 
-  protected async getRecord(key: string): Promise<CloudRecord | null> {
+  public async getRecord(key: string): Promise<CloudRecord | null> {
     return this.store.get(key) ?? null;
   }
 
-  protected async saveRecord(record: CloudRecord, _options?: PutOptions): Promise<CloudRecord> {
+  public async saveRecord(record: CloudRecord, _options?: PutOptions): Promise<CloudRecord> {
     this.tagCounter++;
     const saved: CloudRecord = {
       recordName: record.recordName,
@@ -29,11 +29,11 @@ class InMemoryRecordProvider extends RecordBackedDocumentProvider {
     return saved;
   }
 
-  protected async removeRecord(key: string): Promise<void> {
+  public async removeRecord(key: string): Promise<void> {
     this.store.delete(key);
   }
 
-  protected async listRecords(): Promise<CloudRecord[]> {
+  public async listRecords(): Promise<CloudRecord[]> {
     return Array.from(this.store.values());
   }
 }

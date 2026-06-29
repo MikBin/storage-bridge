@@ -96,17 +96,17 @@ describe('OneDriveProvider', () => {
   describe('CRUD via FileBackedDocumentProvider', () => {
     it('listFiles returns empty when no files exist', async () => {
       const { provider } = createProvider();
-      const files = await (provider as any).listFiles();
+      const files = await provider.listFiles();
       expect(files).toEqual([]);
     });
 
     it('writeFile creates a new file and readFile retrieves it', async () => {
       const { provider } = createProvider();
-      const meta = await (provider as any).writeFile('test-key.json', '{"data":true}');
+      const meta = await provider.writeFile('test-key.json', '{"data":true}');
       expect(meta.id).toBeDefined();
       expect(meta.revision).toBeDefined();
 
-      const result = await (provider as any).readFile('test-key.json');
+      const result = await provider.readFile('test-key.json');
       expect(result).not.toBeNull();
       expect(result!.text).toBe('{"data":true}');
       expect(result!.meta.revision).toBe(meta.revision);
@@ -114,34 +114,34 @@ describe('OneDriveProvider', () => {
 
     it('writeFile updates an existing file', async () => {
       const { provider } = createProvider();
-      const v1 = await (provider as any).writeFile('cfg.json', '{"v":1}');
-      const v2 = await (provider as any).writeFile('cfg.json', '{"v":2}');
+      const v1 = await provider.writeFile('cfg.json', '{"v":1}');
+      const v2 = await provider.writeFile('cfg.json', '{"v":2}');
       expect(v2.revision).not.toBe(v1.revision);
 
-      const result = await (provider as any).readFile('cfg.json');
+      const result = await provider.readFile('cfg.json');
       expect(result!.text).toBe('{"v":2}');
     });
 
     it('removeFile deletes a file', async () => {
       const { provider } = createProvider();
-      await (provider as any).writeFile('del.json', '{}');
-      await (provider as any).removeFile('del.json');
-      const result = await (provider as any).readFile('del.json');
+      await provider.writeFile('del.json', '{}');
+      await provider.removeFile('del.json');
+      const result = await provider.readFile('del.json');
       expect(result).toBeNull();
     });
 
     it('removeFile is no-op for missing file', async () => {
       const { provider } = createProvider();
-      await expect((provider as any).removeFile('nonexistent.json')).resolves.toBeUndefined();
+      await expect(provider.removeFile('nonexistent.json')).resolves.toBeUndefined();
     });
 
     it('listFiles returns all stored files', async () => {
       const { provider } = createProvider();
-      await (provider as any).writeFile('a.json', '{}');
-      await (provider as any).writeFile('b.json', '{}');
-      const files = await (provider as any).listFiles();
+      await provider.writeFile('a.json', '{}');
+      await provider.writeFile('b.json', '{}');
+      const files = await provider.listFiles();
       expect(files).toHaveLength(2);
-      const keys = files.map((f: any) => f.name).sort();
+      const keys = files.map(f => f.name).sort();
       expect(keys).toEqual(['a.json', 'b.json']);
     });
   });
@@ -149,8 +149,8 @@ describe('OneDriveProvider', () => {
   describe('optimistic concurrency', () => {
     it('writeFile with matching expectedRevision succeeds', async () => {
       const { provider } = createProvider();
-      const v1 = await (provider as any).writeFile('conflict.json', '{"v":1}');
-      const v2 = await (provider as any).writeFile('conflict.json', '{"v":2}', {
+      const v1 = await provider.writeFile('conflict.json', '{"v":1}');
+      const v2 = await provider.writeFile('conflict.json', '{"v":2}', {
         expectedRevision: v1.revision,
       });
       expect(v2.revision).toBeDefined();
@@ -158,16 +158,16 @@ describe('OneDriveProvider', () => {
 
     it('writeFile with mismatched expectedRevision throws ConflictError', async () => {
       const { provider } = createProvider();
-      await (provider as any).writeFile('conflict.json', '{"v":1}');
+      await provider.writeFile('conflict.json', '{"v":1}');
       await expect(
-        (provider as any).writeFile('conflict.json', '{"v":2}', { expectedRevision: 'wrong-etag' }),
+        provider.writeFile('conflict.json', '{"v":2}', { expectedRevision: 'wrong-etag' }),
       ).rejects.toThrow(ConflictError);
     });
 
     it('writeFile without expectedRevision always succeeds', async () => {
       const { provider } = createProvider();
-      await (provider as any).writeFile('free.json', '{"v":1}');
-      const updated = await (provider as any).writeFile('free.json', '{"v":2}');
+      await provider.writeFile('free.json', '{"v":1}');
+      const updated = await provider.writeFile('free.json', '{"v":2}');
       expect(updated.revision).toBeDefined();
     });
   });
@@ -178,17 +178,17 @@ describe('OneDriveProvider', () => {
         login: async () => {},
         logout: async () => {},
         getAccessToken: async () => 'bad-token',
-        getTokens: async () => ({ accessToken: 'bad-token', tokenType: 'Bearer' }),
+        getTokens: async () => ({ accessToken: 'bad-token', tokenType: 'Bearer', expiresAt: Date.now() + 3600000 }),
         getAuthHeaders: async () => ({ Authorization: 'Bearer bad-token' }),
       };
       const { mockFetch } = createOneDriveApiMock();
       const provider = new OneDriveProvider({ auth, fetchFn: mockFetch as typeof fetch });
-      await expect((provider as any).listFiles()).rejects.toThrow(AuthRequiredError);
+      await expect(provider.listFiles()).rejects.toThrow(AuthRequiredError);
     });
 
     it('readFile returns null for 404', async () => {
       const { provider } = createProvider();
-      const result = await (provider as any).readFile('nonexistent.json');
+      const result = await provider.readFile('nonexistent.json');
       expect(result).toBeNull();
     });
   });

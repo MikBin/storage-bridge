@@ -46,7 +46,7 @@ export class OneDriveProvider extends FileBackedDocumentProvider {
     return { provider: this.id };
   }
 
-  protected async readFile(fileName: string): Promise<{ text: string; meta: FileEntry } | null> {
+  public async readFile(fileName: string): Promise<{ text: string; meta: FileEntry } | null> {
     const res = await this.fetchFn(`${GRAPH_BASE}:/${fileName}:/content`, {
       headers: await this.auth.getAuthHeaders(),
     });
@@ -59,7 +59,7 @@ export class OneDriveProvider extends FileBackedDocumentProvider {
     return { text: await res.text(), meta };
   }
 
-  protected async writeFile(fileName: string, body: string, options?: PutOptions): Promise<FileEntry> {
+  public async writeFile(fileName: string, body: string, options?: PutOptions): Promise<FileEntry> {
     const headers: Record<string, string> = {
       ...(await this.auth.getAuthHeaders()),
       'Content-Type': 'application/json',
@@ -82,7 +82,7 @@ export class OneDriveProvider extends FileBackedDocumentProvider {
     return toFileEntry(await res.json() as OneDriveItemRaw, (n) => this.fileNameToKey(n));
   }
 
-  protected async removeFile(fileName: string): Promise<void> {
+  public async removeFile(fileName: string): Promise<void> {
     const res = await this.fetchFn(`${GRAPH_BASE}:/${fileName}`, {
       method: 'DELETE',
       headers: await this.auth.getAuthHeaders(),
@@ -93,7 +93,7 @@ export class OneDriveProvider extends FileBackedDocumentProvider {
     if (!res.ok) throw new SettingsStoreError(`OneDrive delete failed: ${res.status}`, 'ONEDRIVE_DELETE_ERROR');
   }
 
-  protected async listFiles(): Promise<FileEntry[]> {
+  public async listFiles(): Promise<FileEntry[]> {
     const res = await this.fetchFn(`${GRAPH_BASE}/children`, {
       headers: await this.auth.getAuthHeaders(),
     });
