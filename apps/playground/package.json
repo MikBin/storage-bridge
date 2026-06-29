@@ -1,0 +1,27 @@
+{
+  "name": "@storage-bridge/playground",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src/"
+  },
+  "dependencies": {
+    "@storage-bridge/core": "workspace:*",
+    "@storage-bridge/auth-web": "workspace:*",
+    "@storage-bridge/provider-google-drive": "workspace:*",
+    "@storage-bridge/provider-dropbox": "workspace:*",
+    "@storage-bridge/provider-onedrive": "workspace:*",
+    "@storage-bridge/provider-icloud": "workspace:*"
+  },
+  "devDependencies": {
+    "vite": "^5.0.0",
+    "typescript": "latest",
+    "@storage-bridge/eslint-config": "workspace:*",
+    "@storage-bridge/typescript-config": "workspace:*"
+  }
+}
