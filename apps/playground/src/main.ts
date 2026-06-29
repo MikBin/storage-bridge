@@ -74,7 +74,9 @@ function loadState(): PlaygroundState {
   if (raw) {
     try {
       return JSON.parse(raw);
-    } catch {}
+    } catch (err) {
+      console.error('Failed to parse state:', err);
+    }
   }
   return {
     providerId: 'local',
@@ -154,8 +156,9 @@ async function refreshDocumentList() {
           await store.delete(doc.key);
           log(`Deleted document: ${doc.key}`, 'success');
           refreshDocumentList();
-        } catch (err: any) {
-          log(`Failed to delete document: ${err.message}`, 'error');
+        } catch (err) {
+          const errMsg = err instanceof Error ? err.message : String(err);
+          log(`Failed to delete document: ${errMsg}`, 'error');
         }
       });
 
@@ -166,15 +169,16 @@ async function refreshDocumentList() {
       elDocList.appendChild(li);
     });
     log(`Found ${docs.length} documents.`, 'success');
-  } catch (err: any) {
-    log(`Failed to list documents: ${err.message}`, 'error');
+  } catch (err) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    log(`Failed to list documents: ${errMsg}`, 'error');
   }
 }
 
 async function loadDocumentIntoEditor(key: string) {
   try {
     log(`Loading document: ${key}...`);
-    const envelope = await store.get<any>(key);
+    const envelope = await store.get<unknown>(key);
     if (envelope) {
       elDocKeyInput.value = envelope.key;
       elDocRevisionInput.value = envelope.revision ?? '';
@@ -183,8 +187,9 @@ async function loadDocumentIntoEditor(key: string) {
     } else {
       log(`Document ${key} not found`, 'error');
     }
-  } catch (err: any) {
-    log(`Failed to fetch document: ${err.message}`, 'error');
+  } catch (err) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    log(`Failed to fetch document: ${errMsg}`, 'error');
   }
 }
 
@@ -227,8 +232,9 @@ elBtnConnect.addEventListener('click', async () => {
       await store.connect('local');
       log('Connected to Local provider successfully!', 'success');
       await updateStatusUI();
-    } catch (err: any) {
-      log(`Connection failed: ${err.message}`, 'error');
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      log(`Connection failed: ${errMsg}`, 'error');
     }
     return;
   }
@@ -292,8 +298,9 @@ elBtnConnect.addEventListener('click', async () => {
   try {
     log(`Initiating OAuth connection flow for ${providerId}...`);
     await store.connect(providerId); // Redirects user
-  } catch (err: any) {
-    log(`Auth launch failed: ${err.message}`, 'error');
+  } catch (err) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    log(`Auth launch failed: ${errMsg}`, 'error');
   }
 });
 
@@ -304,8 +311,9 @@ elBtnDisconnect.addEventListener('click', async () => {
     await store.disconnect();
     log('Disconnected successfully.', 'success');
     await updateStatusUI();
-  } catch (err: any) {
-    log(`Disconnect failed: ${err.message}`, 'error');
+  } catch (err) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    log(`Disconnect failed: ${errMsg}`, 'error');
   }
 });
 
@@ -329,11 +337,12 @@ elBtnDocPut.addEventListener('click', async () => {
     return;
   }
 
-  let parsedData = {};
+  let parsedData: unknown;
   try {
     parsedData = JSON.parse(dataRaw || '{}');
-  } catch (err: any) {
-    alert(`Invalid JSON payload: ${err.message}`);
+  } catch (err) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    alert(`Invalid JSON payload: ${errMsg}`);
     return;
   }
 
@@ -344,11 +353,12 @@ elBtnDocPut.addEventListener('click', async () => {
     log(`Successfully put document: ${key}`, 'success');
     elDocRevisionInput.value = envelope.revision ?? '';
     refreshDocumentList();
-  } catch (err: any) {
+  } catch (err) {
     if (err instanceof ConflictError) {
       log(`Conflict detected for key ${key}: ${err.message}`, 'error');
     } else {
-      log(`Failed to put document: ${err.message}`, 'error');
+      const errMsg = err instanceof Error ? err.message : String(err);
+      log(`Failed to put document: ${errMsg}`, 'error');
     }
   }
 });
@@ -367,8 +377,9 @@ elBtnDocDelete.addEventListener('click', async () => {
     elDocRevisionInput.value = '';
     elDocDataTextarea.value = '';
     refreshDocumentList();
-  } catch (err: any) {
-    log(`Failed to delete document: ${err.message}`, 'error');
+  } catch (err) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    log(`Failed to delete document: ${errMsg}`, 'error');
   }
 });
 
@@ -445,8 +456,9 @@ async function init() {
       log(`Connecting store to ${providerId}...`);
       await store.connect(providerId);
       log(`Store connected to ${providerId}`, 'success');
-    } catch (err: any) {
-      log(`Failed to complete OAuth flow: ${err.message}`, 'error');
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      log(`Failed to complete OAuth flow: ${errMsg}`, 'error');
     }
   } else {
     // No callback; if provider is 'local', auto-connect for seamless developer usage
@@ -454,8 +466,9 @@ async function init() {
       try {
         await store.connect('local');
         log('Connected to Local provider successfully.', 'success');
-      } catch (err: any) {
-        log(`Failed to auto-connect to Local: ${err.message}`, 'error');
+      } catch (err) {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        log(`Failed to auto-connect to Local: ${errMsg}`, 'error');
       }
     }
   }
