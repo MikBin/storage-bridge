@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import fc from 'fast-check';
-import { FileBackedDocumentProvider } from '../providers/file-backed-document-provider.js';
+import { FileBackedDocumentProvider, type FileEntry } from '../providers/file-backed-document-provider.js';
 import { ProviderRegistry } from '../registry.js';
 import type { ProviderId, ProviderCapability, DocumentStoreProvider } from '../types.js';
 
@@ -11,7 +11,13 @@ class MockFileBackedProvider extends FileBackedDocumentProvider {
   async isConnected() { return true; }
   async getProfile() { return null; }
   async readFile() { return null; }
-  async writeFile() { return {} as any; }
+  async writeFile(fileName: string): Promise<FileEntry> {
+    return {
+      id: 'mock-id',
+      logicalKey: this.fileNameToKey(fileName),
+      name: fileName,
+    };
+  }
   async removeFile() {}
   async listFiles() { return []; }
 }
