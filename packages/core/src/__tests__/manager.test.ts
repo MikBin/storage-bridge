@@ -10,7 +10,6 @@ import type {
   DocumentStoreProvider,
   ProviderDescriptor,
   ProviderId,
-  PutOptions,
   SettingsEnvelope,
   SettingsSummary,
 } from '../types.js';
@@ -46,8 +45,7 @@ class FakeProvider implements DocumentStoreProvider {
   }
 
   public async putDocument<T>(
-    doc: SettingsEnvelope<T>,
-    options?: PutOptions
+    doc: SettingsEnvelope<T>
   ): Promise<SettingsEnvelope<T>> {
     const newDoc = { ...doc, revision: `rev-${Date.now()}`, updatedAt: new Date().toISOString() };
     this.documents.set(doc.key, newDoc);

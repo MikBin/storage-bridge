@@ -1,0 +1,38 @@
+{
+  "name": "@storage-bridge/example-react-native",
+  "version": "1.1.0",
+  "private": true,
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web",
+    "lint": "eslint App.tsx",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@expo/metro-runtime": "~4.0.1",
+    "@storage-bridge/auth-react-native": "workspace:*",
+    "@storage-bridge/core": "workspace:*",
+    "@storage-bridge/provider-google-drive": "workspace:*",
+    "@storage-bridge/provider-onedrive": "workspace:*",
+    "expo": "~52.0.0",
+    "expo-auth-session": "~6.0.3",
+    "expo-secure-store": "~14.0.1",
+    "expo-status-bar": "~2.0.0",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "react-native": "0.76.9",
+    "react-native-web": "~0.19.13"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.25.0",
+    "@babel/runtime": "^7.25.0",
+    "@storage-bridge/eslint-config": "workspace:*",
+    "@storage-bridge/typescript-config": "workspace:*",
+    "@types/react": "~18.3.0",
+    "typescript": "^5.9.3"
+  }
+}

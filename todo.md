@@ -10,17 +10,16 @@ This file tracks the outstanding tasks required to bring the Storage Bridge proj
 ## 2. Missing Features & Documentation
 - [x] Implement interactive playground app (`TASK-15`) in `apps/playground`
   - Allows manual verification of CRUD settings across providers
-- [ ] Build end-to-end usage example apps (`TASK-16`)
-  - [ ] React SPA web example with Google Drive and OneDrive
-  - [ ] React Native mobile example with OAuth flow
-  - [ ] Capacitor hybrid example
-- [ ] Compile API references from TSDoc comments (`apps/docs`)
+- [/] Build end-to-end usage example apps (`TASK-16`)
+  - [x] React Native mobile example with OAuth flow (`examples/react-native`)
+  - [ ] React SPA web example with Google Drive and OneDrive (dropped)
+  - [ ] Capacitor hybrid example (deferred)
+- [x] Compile API references from TSDoc comments (`apps/docs`)
 
 ## 3. Code Quality & Type Safety (Address ANY_USAGE_REPORT.md)
-- [ ] Eliminate `any` casts in tests by changing provider methods to `public`
-  - Refactor `listFiles`, `readFile`, `writeFile`, and `removeFile`
-- [ ] Type external API boundaries with formal DTO structures (e.g., CloudKit client)
-- [ ] Replace remaining instances of `any` with `unknown` or explicit types
+- [x] Eliminate `any` casts in tests by changing provider methods to `public`
+- [x] Type external API boundaries with formal DTO structures (e.g., CloudKit client)
+- [x] Replace remaining instances of `any` with `unknown` or explicit types (completed with MockFileBackedProvider.writeFile fix)
 
 ## 4. DevOps & Release Engineering
 - [ ] Build CI/CD pipeline (e.g., GitHub Actions) to automate:

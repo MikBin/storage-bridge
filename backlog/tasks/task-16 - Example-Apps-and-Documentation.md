@@ -1,7 +1,7 @@
 ---
 id: TASK-16
 title: Example Apps and Documentation
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-04-13 15:43'
 labels: []
@@ -22,9 +22,9 @@ Create example applications and documentation showing end-to-end usage across pl
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 examples/react-web React SPA with Google Drive and OneDrive providers
-- [ ] #2 examples/react-native demonstrating mobile auth flow
-- [ ] #3 examples/capacitor hybrid app example
-- [ ] #4 apps/docs API reference from TSDoc comments
-- [ ] #5 Each example has a README with setup instructions
+- [ ] #1 examples/react-web React SPA with Google Drive and OneDrive providers (dropped)
+- [x] #2 examples/react-native demonstrating mobile auth flow
+- [ ] #3 examples/capacitor hybrid app example (deferred)
+- [x] #4 apps/docs API reference from TSDoc comments
+- [x] #5 Each example has a README with setup instructions
 <!-- AC:END -->

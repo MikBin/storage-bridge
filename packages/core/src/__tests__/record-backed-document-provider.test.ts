@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { CloudRecord } from '../providers/record-backed-document-provider.js';
 import { RecordBackedDocumentProvider } from '../providers/record-backed-document-provider.js';
-import type { ProviderId, PutOptions, ConnectedProfile } from '../types.js';
+import type { ProviderId, ConnectedProfile } from '../types.js';
 
 class InMemoryRecordProvider extends RecordBackedDocumentProvider {
   readonly id: ProviderId = 'icloud';
@@ -17,7 +17,7 @@ class InMemoryRecordProvider extends RecordBackedDocumentProvider {
     return this.store.get(key) ?? null;
   }
 
-  public async saveRecord(record: CloudRecord, _options?: PutOptions): Promise<CloudRecord> {
+  public async saveRecord(record: CloudRecord): Promise<CloudRecord> {
     this.tagCounter++;
     const saved: CloudRecord = {
       recordName: record.recordName,

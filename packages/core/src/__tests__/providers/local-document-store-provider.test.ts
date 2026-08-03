@@ -60,7 +60,7 @@ describe('LocalDocumentStoreProvider', () => {
 
     it('putDocument increments revision on update', async () => {
       const doc = { key: 'test', schemaVersion: 1, updatedAt: '', data: { foo: 'bar' } };
-      const saved1 = await provider.putDocument(doc);
+      await provider.putDocument(doc);
 
       const doc2 = { key: 'test', schemaVersion: 1, updatedAt: '', data: { foo: 'baz' } };
       const saved2 = await provider.putDocument(doc2);

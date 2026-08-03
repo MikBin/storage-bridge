@@ -1,5 +1,4 @@
 import { describe, it, expect } from 'vitest';
-import type { DocumentStoreProvider } from '@storage-bridge/core';
 import { ConflictError } from '@storage-bridge/core';
 import type { ProviderFactory } from './types.js';
 
@@ -61,7 +60,7 @@ export function describeProviderContract(
 
       it('putDocument() then getDocument() returns the same data', async () => {
         const provider = factory();
-        const doc = await provider.putDocument<{ x: number }>({
+        await provider.putDocument<{ x: number }>({
           key: 'round-trip',
           schemaVersion: 1,
           updatedAt: '',

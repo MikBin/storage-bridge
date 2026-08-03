@@ -1,0 +1,20 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "entryPoints": [
+    "../../packages/core/src/index.ts",
+    "../../packages/auth-web/src/index.ts",
+    "../../packages/auth-react-native/src/index.ts",
+    "../../packages/provider-google-drive/src/index.ts",
+    "../../packages/provider-onedrive/src/index.ts",
+    "../../packages/provider-dropbox/src/index.ts",
+    "../../packages/provider-icloud/src/index.ts"
+  ],
+  "entryPointStrategy": "resolve",
+  "out": "dist",
+  "name": "Storage Bridge API Reference",
+  "excludePrivate": true,
+  "excludeProtected": false,
+  "hideGenerator": true,
+  "theme": "default",
+  "readme": "../../README.md"
+}

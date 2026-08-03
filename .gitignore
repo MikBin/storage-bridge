@@ -144,3 +144,11 @@ vite.config.ts.timestamp-*
 
 # Turborepo
 .turbo/
+
+# Expo
+.expo/
+.expo-shared/
+
+# TypeDoc output
+apps/docs/dist/
+
