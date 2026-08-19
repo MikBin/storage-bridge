@@ -1,8 +1,8 @@
-import type { OAuthClient } from '@storage-bridge/auth-web';
 import {
   FileBackedDocumentProvider,
   type FileEntry,
   type PutOptions,
+  type OAuthClient,
   ConflictError,
   AuthRequiredError,
   SettingsStoreError,
@@ -91,16 +91,27 @@ export class GoogleDriveProvider extends FileBackedDocumentProvider {
   }
 
   public async listFiles(): Promise<FileEntry[]> {
-    const res = await this.fetchFn(
-      `${DRIVE_API_BASE}?spaces=appDataFolder&fields=files(id,name,mimeType,size,modifiedTime,version)`,
-      { headers: await this.auth.getAuthHeaders() },
-    );
+    const allFiles: GoogleDriveFileRaw[] = [];
+    let pageToken: string | undefined;
 
-    if (res.status === 401 || res.status === 403) throw new AuthRequiredError(this.id);
-    if (!res.ok) throw new SettingsStoreError(`Drive list failed: ${res.status}`, 'DRIVE_LIST_ERROR');
+    do {
+      const pageParam = pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : '';
+      const res = await this.fetchFn(
+        `${DRIVE_API_BASE}?spaces=appDataFolder&fields=nextPageToken,files(id,name,mimeType,size,modifiedTime,version)${pageParam}`,
+        { headers: await this.auth.getAuthHeaders() },
+      );
 
-    const json = await res.json() as { files?: GoogleDriveFileRaw[] };
-    return (json.files ?? []).map(f => toFileEntry(f, (name) => this.fileNameToKey(name)));
+      if (res.status === 401 || res.status === 403) throw new AuthRequiredError(this.id);
+      if (!res.ok) throw new SettingsStoreError(`Drive list failed: ${res.status}`, 'DRIVE_LIST_ERROR');
+
+      const json = await res.json() as { files?: GoogleDriveFileRaw[]; nextPageToken?: string };
+      if (json.files) {
+        allFiles.push(...json.files);
+      }
+      pageToken = json.nextPageToken;
+    } while (pageToken);
+
+    return allFiles.map(f => toFileEntry(f, (name) => this.fileNameToKey(name)));
   }
 
   private async findFileByName(name: string): Promise<FileEntry | null> {

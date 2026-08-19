@@ -21,6 +21,9 @@ export class LocalDocumentStoreProvider implements DocumentStoreProvider {
 
   async disconnect(): Promise<void> {
     this.connected = false;
+  }
+
+  public clear(): void {
     this.store.clear();
     this.revisionCounters.clear();
   }

@@ -1,8 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { OneDriveProvider } from '../onedrive-provider.js';
 import { createOneDriveApiMock } from './onedrive-api-mock.js';
-import type { OAuthClient, OAuthTokens } from '@storage-bridge/auth-web';
-import { ConflictError, AuthRequiredError } from '@storage-bridge/core';
+import { ConflictError, AuthRequiredError, type OAuthClient, type OAuthTokens } from '@storage-bridge/core';
 
 function createFakeOAuthClient(): OAuthClient {
   const tokens: OAuthTokens = {
@@ -143,6 +142,33 @@ describe('OneDriveProvider', () => {
       expect(files).toHaveLength(2);
       const keys = files.map(f => f.name).sort();
       expect(keys).toEqual(['a.json', 'b.json']);
+    });
+
+    it('listFiles paginates through multiple pages with @odata.nextLink', async () => {
+      const auth = createFakeOAuthClient();
+      let callCount = 0;
+      const mockFetch = async (input: string | URL | Request): Promise<Response> => {
+        const url = String(input);
+        callCount++;
+        if (url.includes('next-page-url')) {
+          return new Response(JSON.stringify({
+            value: [{ id: 'id-3', name: 'c.json', eTag: 'rev-3', lastModifiedDateTime: '2026-01-01T00:00:00Z', size: 10, file: {} }],
+          }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        }
+        return new Response(JSON.stringify({
+          value: [
+            { id: 'id-1', name: 'a.json', eTag: 'rev-1', lastModifiedDateTime: '2026-01-01T00:00:00Z', size: 10, file: {} },
+            { id: 'id-2', name: 'b.json', eTag: 'rev-2', lastModifiedDateTime: '2026-01-01T00:00:00Z', size: 10, file: {} },
+          ],
+          '@odata.nextLink': 'https://graph.microsoft.com/v1.0/next-page-url',
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      };
+
+      const provider = new OneDriveProvider({ auth, fetchFn: mockFetch as typeof fetch });
+      const files = await provider.listFiles();
+      expect(files).toHaveLength(3);
+      expect(files.map(f => f.name)).toEqual(['a.json', 'b.json', 'c.json']);
+      expect(callCount).toBe(2);
     });
   });
 

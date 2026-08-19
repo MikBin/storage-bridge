@@ -1,8 +1,8 @@
-import type { OAuthClient } from '@storage-bridge/auth-web';
 import {
   FileBackedDocumentProvider,
   type FileEntry,
   type PutOptions,
+  type OAuthClient,
   ConflictError,
   AuthRequiredError,
   SettingsStoreError,
@@ -74,16 +74,21 @@ export class DropboxProvider extends FileBackedDocumentProvider {
       }
     }
 
+    const mode = options?.expectedRevision
+      ? { '.tag': 'update', update: options.expectedRevision }
+      : 'overwrite';
+
     const res = await this.fetchFn(`${CONTENT_BASE}/2/files/upload`, {
       method: 'POST',
       headers: {
         ...(await this.auth.getAuthHeaders()),
         'Content-Type': 'application/octet-stream',
-        'Dropbox-API-Arg': JSON.stringify({ path: `/${fileName}`, mode: 'overwrite', mute: true }),
+        'Dropbox-API-Arg': JSON.stringify({ path: `/${fileName}`, mode, mute: true }),
       },
       body,
     });
 
+    if (res.status === 409) throw new ConflictError(fileName);
     if (res.status === 401 || res.status === 403) throw new AuthRequiredError(this.id);
     if (!res.ok) throw new SettingsStoreError(`Dropbox write failed: ${res.status}`, 'DROPBOX_WRITE_ERROR');
 
@@ -106,7 +111,7 @@ export class DropboxProvider extends FileBackedDocumentProvider {
   }
 
   public async listFiles(): Promise<FileEntry[]> {
-    const res = await this.fetchFn(`${API_BASE}/2/files/list_folder`, {
+    let res = await this.fetchFn(`${API_BASE}/2/files/list_folder`, {
       method: 'POST',
       headers: {
         ...(await this.auth.getAuthHeaders()),
@@ -118,14 +123,47 @@ export class DropboxProvider extends FileBackedDocumentProvider {
     if (res.status === 401 || res.status === 403) throw new AuthRequiredError(this.id);
     if (!res.ok) throw new SettingsStoreError(`Dropbox list failed: ${res.status}`, 'DROPBOX_LIST_ERROR');
 
-    const json = await res.json() as { entries?: DropboxFileRaw[] };
-    return (json.entries ?? [])
+    let json = await res.json() as { entries?: DropboxFileRaw[]; has_more?: boolean; cursor?: string };
+    const allEntries: DropboxFileRaw[] = [...(json.entries ?? [])];
+
+    while (json.has_more && json.cursor) {
+      res = await this.fetchFn(`${API_BASE}/2/files/list_folder/continue`, {
+        method: 'POST',
+        headers: {
+          ...(await this.auth.getAuthHeaders()),
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ cursor: json.cursor }),
+      });
+
+      if (res.status === 401 || res.status === 403) throw new AuthRequiredError(this.id);
+      if (!res.ok) throw new SettingsStoreError(`Dropbox list continue failed: ${res.status}`, 'DROPBOX_LIST_ERROR');
+
+      json = await res.json() as { entries?: DropboxFileRaw[]; has_more?: boolean; cursor?: string };
+      allEntries.push(...(json.entries ?? []));
+    }
+
+    return allEntries
       .filter(e => e['.tag'] === 'file')
       .map(e => toFileEntry(e, (n) => this.fileNameToKey(n)));
   }
 
   private async findFileByName(name: string): Promise<FileEntry | null> {
-    const files = await this.listFiles();
-    return files.find(f => f.name === name) ?? null;
+    const res = await this.fetchFn(`${API_BASE}/2/files/get_metadata`, {
+      method: 'POST',
+      headers: {
+        ...(await this.auth.getAuthHeaders()),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ path: `/${name}` }),
+    });
+
+    if (res.status === 409 || res.status === 404) return null;
+    if (res.status === 401 || res.status === 403) throw new AuthRequiredError(this.id);
+    if (!res.ok) return null;
+
+    const raw = await res.json() as DropboxFileRaw;
+    if (raw['.tag'] !== 'file') return null;
+    return toFileEntry(raw, (n) => this.fileNameToKey(n));
   }
 }

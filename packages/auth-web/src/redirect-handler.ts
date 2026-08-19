@@ -2,14 +2,19 @@ import type { PendingAuthState } from './types.js';
 
 const PKCE_STORAGE_PREFIX = 'sb_pkce_';
 
-export interface CallbackResult {
-  success: true;
-  code: string;
-  state: string;
-}
+export type CallbackResult =
+  | { success: true; code: string; state: string }
+  | { success: false; error: string; errorDescription?: string; state?: string | null };
 
 export function handleCallback(): CallbackResult | null {
   const params = new URLSearchParams(window.location.search);
+  const error = params.get('error');
+  if (error) {
+    const errorDescription = params.get('error_description') ?? undefined;
+    const state = params.get('state');
+    return { success: false, error, errorDescription, state };
+  }
+
   const code = params.get('code');
   const state = params.get('state');
 

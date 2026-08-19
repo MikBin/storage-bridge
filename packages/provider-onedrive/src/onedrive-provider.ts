@@ -1,8 +1,8 @@
-import type { OAuthClient } from '@storage-bridge/auth-web';
 import {
   FileBackedDocumentProvider,
   type FileEntry,
   type PutOptions,
+  type OAuthClient,
   ConflictError,
   AuthRequiredError,
   SettingsStoreError,
@@ -94,15 +94,25 @@ export class OneDriveProvider extends FileBackedDocumentProvider {
   }
 
   public async listFiles(): Promise<FileEntry[]> {
-    const res = await this.fetchFn(`${GRAPH_BASE}/children`, {
-      headers: await this.auth.getAuthHeaders(),
-    });
+    const allItems: OneDriveItemRaw[] = [];
+    let nextUrl: string | undefined = `${GRAPH_BASE}/children`;
 
-    if (res.status === 401 || res.status === 403) throw new AuthRequiredError(this.id);
-    if (!res.ok) throw new SettingsStoreError(`OneDrive list failed: ${res.status}`, 'ONEDRIVE_LIST_ERROR');
+    while (nextUrl) {
+      const res = await this.fetchFn(nextUrl, {
+        headers: await this.auth.getAuthHeaders(),
+      });
 
-    const json = await res.json() as { value?: OneDriveItemRaw[] };
-    return (json.value ?? []).map(v => toFileEntry(v, (n) => this.fileNameToKey(n)));
+      if (res.status === 401 || res.status === 403) throw new AuthRequiredError(this.id);
+      if (!res.ok) throw new SettingsStoreError(`OneDrive list failed: ${res.status}`, 'ONEDRIVE_LIST_ERROR');
+
+      const json = await res.json() as { value?: OneDriveItemRaw[]; '@odata.nextLink'?: string };
+      if (json.value) {
+        allItems.push(...json.value);
+      }
+      nextUrl = json['@odata.nextLink'];
+    }
+
+    return allItems.map(v => toFileEntry(v, (n) => this.fileNameToKey(n)));
   }
 
   private async getItemMetadata(fileName: string): Promise<FileEntry> {

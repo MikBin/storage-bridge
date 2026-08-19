@@ -20,6 +20,30 @@ describe('LocalDocumentStoreProvider', () => {
       expect(await provider.isConnected()).toBe(false);
       expect(await provider.getProfile()).toBeNull();
     });
+
+    it('persists data across disconnect and reconnect', async () => {
+      const provider = new LocalDocumentStoreProvider();
+      await provider.connect();
+      await provider.putDocument({ key: 'pref', schemaVersion: 1, updatedAt: '', data: { theme: 'dark' } });
+
+      await provider.disconnect();
+      expect(await provider.isConnected()).toBe(false);
+
+      await provider.connect();
+      expect(await provider.isConnected()).toBe(true);
+      const retrieved = await provider.getDocument('pref');
+      expect(retrieved?.data).toEqual({ theme: 'dark' });
+    });
+
+    it('clear() wipes all data explicitly', async () => {
+      const provider = new LocalDocumentStoreProvider();
+      await provider.connect();
+      await provider.putDocument({ key: 'pref', schemaVersion: 1, updatedAt: '', data: { theme: 'dark' } });
+
+      provider.clear();
+      const retrieved = await provider.getDocument('pref');
+      expect(retrieved).toBeNull();
+    });
   });
 
   describe('Operations when disconnected', () => {

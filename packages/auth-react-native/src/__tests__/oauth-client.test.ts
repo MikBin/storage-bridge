@@ -1,8 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ReactNativeOAuthClient } from '../oauth-client.js';
 import type { ReactNativeOAuthConfig } from '../types.js';
-import { AuthRequiredError } from '@storage-bridge/core';
-import type { OAuthTokens } from '@storage-bridge/auth-web';
+import { AuthRequiredError, type OAuthTokens } from '@storage-bridge/core';
 
 const mockConfig: ReactNativeOAuthConfig = {
   providerId: 'google-drive',
@@ -142,6 +141,39 @@ describe('ReactNativeOAuthClient', () => {
 
       const token = await client.getAccessToken();
       expect(token).toBe('refreshed-native-token');
+    });
+
+    it('deduplicates concurrent refresh requests', async () => {
+      mockTokenStore.get.mockResolvedValue({
+        accessToken: 'expired-token',
+        refreshToken: 'refresh-123',
+        expiresAt: Date.now() + 30000,
+        tokenType: 'Bearer',
+      });
+
+      mockFetch.mockImplementation(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        return {
+          ok: true,
+          json: async () => ({
+            access_token: 'refreshed-native-concurrent',
+            refresh_token: 'new-refresh',
+            expires_in: 3600,
+            token_type: 'Bearer',
+          }),
+        };
+      });
+
+      const [token1, token2, token3] = await Promise.all([
+        client.getAccessToken(),
+        client.getAccessToken(),
+        client.getAccessToken(),
+      ]);
+
+      expect(token1).toBe('refreshed-native-concurrent');
+      expect(token2).toBe('refreshed-native-concurrent');
+      expect(token3).toBe('refreshed-native-concurrent');
+      expect(mockFetch).toHaveBeenCalledTimes(1);
     });
   });
 

@@ -29,8 +29,29 @@ describe('handleCallback', () => {
     window.location = { ...originalLocation, search: '?code=auth-code-xyz&state=state-abc' };
     const result = handleCallback();
     expect(result).not.toBeNull();
-    expect(result!.code).toBe('auth-code-xyz');
-    expect(result!.state).toBe('state-abc');
+    expect(result!.success).toBe(true);
+    if (result && result.success) {
+      expect(result.code).toBe('auth-code-xyz');
+      expect(result.state).toBe('state-abc');
+    }
+    // @ts-expect-error mock location search
+    window.location = originalLocation;
+  });
+
+  it('extracts error and error_description from URL params', () => {
+    const originalLocation = window.location;
+    // @ts-expect-error mock location search
+    delete window.location;
+    // @ts-expect-error mock location search
+    window.location = { ...originalLocation, search: '?error=access_denied&error_description=User+cancelled&state=state-abc' };
+    const result = handleCallback();
+    expect(result).not.toBeNull();
+    expect(result!.success).toBe(false);
+    if (result && !result.success) {
+      expect(result.error).toBe('access_denied');
+      expect(result.errorDescription).toBe('User cancelled');
+      expect(result.state).toBe('state-abc');
+    }
     // @ts-expect-error mock location search
     window.location = originalLocation;
   });

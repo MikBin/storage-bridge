@@ -1,19 +1,6 @@
-import type { ProviderId } from '@storage-bridge/core';
+import type { ProviderId, OAuthTokens, OAuthClient } from '@storage-bridge/core';
 
-export interface OAuthTokens {
-  accessToken: string;
-  refreshToken?: string;
-  expiresAt?: number;
-  tokenType?: 'Bearer';
-}
-
-export interface OAuthClient {
-  login(): Promise<void>;
-  logout(): Promise<void>;
-  getAccessToken(): Promise<string>;
-  getTokens(): Promise<OAuthTokens | null>;
-  getAuthHeaders(): Promise<Record<string, string>>;
-}
+export type { OAuthTokens, OAuthClient };
 
 export interface OAuthProviderConfig {
   providerId: ProviderId;

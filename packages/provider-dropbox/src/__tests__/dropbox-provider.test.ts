@@ -1,8 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { DropboxProvider } from '../dropbox-provider.js';
 import { createDropboxApiMock } from './dropbox-api-mock.js';
-import type { OAuthClient, OAuthTokens } from '@storage-bridge/auth-web';
-import { ConflictError, AuthRequiredError } from '@storage-bridge/core';
+import { ConflictError, AuthRequiredError, type OAuthClient, type OAuthTokens } from '@storage-bridge/core';
 
 const noopFetch = (() => Promise.resolve(new Response())) as unknown as typeof fetch;
 
@@ -145,6 +144,38 @@ describe('DropboxProvider', () => {
       expect(files).toHaveLength(2);
       const keys = files.map(f => f.name).sort();
       expect(keys).toEqual(['a.json', 'b.json']);
+    });
+
+    it('listFiles paginates through multiple pages when has_more is true', async () => {
+      const auth = createFakeOAuthClient();
+      let callCount = 0;
+      const mockFetch = async (input: string | URL | Request): Promise<Response> => {
+        const url = String(input);
+        if (url.includes('/list_folder/continue')) {
+          return new Response(JSON.stringify({
+            entries: [{ id: 'id:3', name: 'c.json', '.tag': 'file', rev: 'rev-3', server_modified: '2026-01-01T00:00:00Z', size: 10 }],
+            has_more: false,
+          }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        }
+        if (url.includes('/list_folder')) {
+          callCount++;
+          return new Response(JSON.stringify({
+            entries: [
+              { id: 'id:1', name: 'a.json', '.tag': 'file', rev: 'rev-1', server_modified: '2026-01-01T00:00:00Z', size: 10 },
+              { id: 'id:2', name: 'b.json', '.tag': 'file', rev: 'rev-2', server_modified: '2026-01-01T00:00:00Z', size: 10 },
+            ],
+            has_more: true,
+            cursor: 'next-page-cursor',
+          }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        }
+        return new Response('{}', { status: 200 });
+      };
+
+      const provider = new DropboxProvider({ auth, fetchFn: mockFetch as typeof fetch });
+      const files = await provider.listFiles();
+      expect(files).toHaveLength(3);
+      expect(files.map(f => f.name)).toEqual(['a.json', 'b.json', 'c.json']);
+      expect(callCount).toBe(1);
     });
   });
 

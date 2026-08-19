@@ -1,4 +1,4 @@
-import type { OAuthClient, OAuthTokens } from '@storage-bridge/auth-web';
+import type { OAuthClient, OAuthTokens } from '@storage-bridge/core';
 import type { ReactNativeOAuthConfig } from './types.js';
 import { AuthRequest } from 'expo-auth-session';
 import { AuthRequiredError } from '@storage-bridge/core';
@@ -21,6 +21,7 @@ export class ReactNativeOAuthClient implements OAuthClient {
   private readonly config: ReactNativeOAuthConfig;
   private readonly tokenStore: NativeTokenStore;
   private readonly fetchFn: typeof fetch;
+  private refreshPromise: Promise<string> | null = null;
 
   constructor(options: ReactNativeOAuthClientOptions) {
     this.config = options.config;
@@ -99,10 +100,22 @@ export class ReactNativeOAuthClient implements OAuthClient {
     }
 
     if (tokens.expiresAt && tokens.expiresAt - Date.now() < REFRESH_BUFFER_MS) {
-      return this.refreshTokens(tokens);
+      return this.refreshTokensWithLock(tokens);
     }
 
     return tokens.accessToken;
+  }
+
+  private async refreshTokensWithLock(tokens: OAuthTokens): Promise<string> {
+    if (this.refreshPromise) {
+      return this.refreshPromise;
+    }
+
+    this.refreshPromise = this.refreshTokens(tokens).finally(() => {
+      this.refreshPromise = null;
+    });
+
+    return this.refreshPromise;
   }
 
   async getTokens(): Promise<OAuthTokens | null> {

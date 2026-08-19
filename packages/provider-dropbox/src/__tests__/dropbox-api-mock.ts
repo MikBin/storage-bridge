@@ -23,7 +23,7 @@ function generateRev(): string {
 
 /**
  * Create a mock fetch function that simulates Dropbox API v2 endpoints.
- * Supports: /2/files/download, /2/files/upload, /2/files/delete_v2, /2/files/list_folder.
+ * Supports: /2/files/download, /2/files/upload, /2/files/delete_v2, /2/files/list_folder, /2/files/get_metadata.
  */
 export function createDropboxApiMock() {
   const files = new Map<string, MockFile>();
@@ -45,6 +45,35 @@ export function createDropboxApiMock() {
     const authHeader = headers?.['Authorization'];
     if (!authHeader?.startsWith('Bearer test-token')) {
       return new Response(JSON.stringify({ error_summary: 'invalid_access_token', error: {} }), { status: 401 });
+    }
+
+    // api.dropboxapi.com/2/files/get_metadata
+    if (hostname === 'api.dropboxapi.com' && path === '/2/files/get_metadata' && method === 'POST') {
+      const body = JSON.parse((init?.body as string) ?? '{}');
+      const filePath: string = body.path;
+      const fileName = filePath.replace(/^\//, '');
+      const file = Array.from(files.values()).find(f => f.name === fileName && !f.deleted);
+
+      if (!file) {
+        return new Response(JSON.stringify({ error_summary: 'path/not_found', error: {} }), {
+          status: 409,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+
+      const meta: DropboxFileRaw = {
+        id: file.id,
+        name: file.name,
+        '.tag': 'file',
+        server_modified: file.server_modified,
+        rev: file.rev,
+        size: file.size,
+      };
+
+      return new Response(JSON.stringify(meta), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
     }
 
     // content.dropboxapi.com/2/files/download
@@ -96,6 +125,15 @@ export function createDropboxApiMock() {
 
       const existing = Array.from(files.values()).find(f => f.name === fileName && !f.deleted);
 
+      if (typeof arg.mode === 'object' && arg.mode?.['.tag'] === 'update') {
+        if (!existing || existing.rev !== arg.mode.update) {
+          return new Response(JSON.stringify({ error_summary: 'path/conflict/file', error: {} }), {
+            status: 409,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+      }
+
       if (existing) {
         existing.content = body;
         existing.rev = generateRev();
@@ -113,7 +151,6 @@ export function createDropboxApiMock() {
           deleted: false,
         };
         files.set(id, file);
-        // Return the newly created file metadata
         const result: DropboxFileRaw = {
           id: file.id,
           name: file.name,
@@ -183,7 +220,15 @@ export function createDropboxApiMock() {
         size: f.size,
       }));
 
-      return new Response(JSON.stringify({ entries }), {
+      return new Response(JSON.stringify({ entries, has_more: false }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    // api.dropboxapi.com/2/files/list_folder/continue
+    if (hostname === 'api.dropboxapi.com' && path === '/2/files/list_folder/continue' && method === 'POST') {
+      return new Response(JSON.stringify({ entries: [], has_more: false }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       });

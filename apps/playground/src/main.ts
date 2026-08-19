@@ -394,6 +394,12 @@ async function init() {
   // Check for callback
   const callback = handleCallback();
   if (callback) {
+    if (!callback.success) {
+      log(`OAuth authentication error: ${callback.error}${callback.errorDescription ? ` - ${callback.errorDescription}` : ''}`, 'error');
+      window.history.replaceState({}, document.title, window.location.pathname);
+      return;
+    }
+
     log('OAuth Callback detected in URI. Completing authentication...', 'info');
     // Clean query parameters from URL
     window.history.replaceState({}, document.title, window.location.pathname);

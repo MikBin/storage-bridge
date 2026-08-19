@@ -1,8 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { GoogleDriveProvider } from '../google-drive-provider.js';
 import { createDriveApiMock } from './google-drive-api-mock.js';
-import type { OAuthClient, OAuthTokens } from '@storage-bridge/auth-web';
-import { ConflictError, AuthRequiredError } from '@storage-bridge/core';
+import { ConflictError, AuthRequiredError, type OAuthClient, type OAuthTokens } from '@storage-bridge/core';
 
 function createFakeOAuthClient(): OAuthClient {
   const tokens: OAuthTokens = {
@@ -147,6 +146,33 @@ describe('GoogleDriveProvider', () => {
       expect(files).toHaveLength(2);
       const keys = files.map((f: { name: string }) => f.name).sort();
       expect(keys).toEqual(['a.json', 'b.json']);
+    });
+
+    it('listFiles paginates through multiple pages with nextPageToken', async () => {
+      const auth = createFakeOAuthClient();
+      let callCount = 0;
+      const mockFetch = async (input: string | URL | Request): Promise<Response> => {
+        const url = String(input);
+        callCount++;
+        if (url.includes('pageToken=page-2-token')) {
+          return new Response(JSON.stringify({
+            files: [{ id: 'id-3', name: 'c.json', modifiedTime: '2026-01-01T00:00:00Z', version: '3', size: '10' }],
+          }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        }
+        return new Response(JSON.stringify({
+          files: [
+            { id: 'id-1', name: 'a.json', modifiedTime: '2026-01-01T00:00:00Z', version: '1', size: '10' },
+            { id: 'id-2', name: 'b.json', modifiedTime: '2026-01-01T00:00:00Z', version: '2', size: '10' },
+          ],
+          nextPageToken: 'page-2-token',
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      };
+
+      const provider = new GoogleDriveProvider({ auth, fetchFn: mockFetch as typeof fetch });
+      const files = await provider.listFiles();
+      expect(files).toHaveLength(3);
+      expect(files.map(f => f.name)).toEqual(['a.json', 'b.json', 'c.json']);
+      expect(callCount).toBe(2);
     });
   });
 
