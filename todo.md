@@ -14,6 +14,8 @@ This file tracks the outstanding tasks required to bring the Storage Bridge proj
   - [x] React Native mobile example with OAuth flow (`examples/react-native`)
   - [ ] React SPA web example with Google Drive and OneDrive (dropped)
   - [ ] Capacitor hybrid example (deferred)
+- [ ] Implement conflict resolution and sync merge strategy (`TASK-17`)
+  - Transparent 3-way auto-merge or lightweight CRDT field-level resolution
 - [x] Compile API references from TSDoc comments (`apps/docs`)
 
 ## 3. Code Quality & Type Safety (Address ANY_USAGE_REPORT.md)
