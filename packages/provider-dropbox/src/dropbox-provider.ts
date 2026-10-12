@@ -1,4 +1,4 @@
-import type { OAuthClient } from '@storage-bridge/auth-web';
+import type { OAuthClient } from '@storage-bridge/core';
 import {
   FileBackedDocumentProvider,
   type FileEntry,

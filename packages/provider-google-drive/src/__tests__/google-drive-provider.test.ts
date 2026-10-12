@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { GoogleDriveProvider } from '../google-drive-provider.js';
 import { createDriveApiMock } from './google-drive-api-mock.js';
-import type { OAuthClient, OAuthTokens } from '@storage-bridge/auth-web';
+import type { OAuthClient, OAuthTokens } from '@storage-bridge/core';
 import { ConflictError, AuthRequiredError, SettingsStoreError } from '@storage-bridge/core';
 
 function createFakeOAuthClient(): OAuthClient {

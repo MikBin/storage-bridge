@@ -11,6 +11,12 @@ import type {
   ProviderCapability,
   ProviderDescriptor,
 } from '../types.js';
+import type {
+  OAuthClient,
+  OAuthTokens,
+  OAuthProviderConfig,
+  PendingAuthState,
+} from '../index.js';
 
 describe('Types', () => {
   it('ProviderId has correct literals', () => {
@@ -99,5 +105,39 @@ describe('Types', () => {
     expectTypeOf<ProviderDescriptor['capabilities']>().toEqualTypeOf<ProviderCapability[]>();
     expectTypeOf<ProviderDescriptor['isSupported']>().toEqualTypeOf<() => Promise<boolean>>();
     expectTypeOf<ProviderDescriptor['create']>().toEqualTypeOf<() => DocumentStoreProvider>();
+  });
+});
+
+describe('OAuth port', () => {
+  it('OAuthTokens has expected structure', () => {
+    expectTypeOf<OAuthTokens['accessToken']>().toBeString();
+    expectTypeOf<OAuthTokens['refreshToken']>().toEqualTypeOf<string | undefined>();
+    expectTypeOf<OAuthTokens['expiresAt']>().toEqualTypeOf<number | undefined>();
+    expectTypeOf<OAuthTokens['tokenType']>().toEqualTypeOf<'Bearer' | undefined>();
+  });
+
+  it('OAuthClient has expected methods', () => {
+    expectTypeOf<OAuthClient['login']>().toEqualTypeOf<() => Promise<void>>();
+    expectTypeOf<OAuthClient['logout']>().toEqualTypeOf<() => Promise<void>>();
+    expectTypeOf<OAuthClient['getAccessToken']>().toEqualTypeOf<() => Promise<string>>();
+    expectTypeOf<OAuthClient['getTokens']>().toEqualTypeOf<() => Promise<OAuthTokens | null>>();
+    expectTypeOf<OAuthClient['getAuthHeaders']>().toEqualTypeOf<() => Promise<Record<string, string>>>();
+  });
+
+  it('OAuthProviderConfig has expected structure', () => {
+    expectTypeOf<OAuthProviderConfig['providerId']>().toEqualTypeOf<ProviderId>();
+    expectTypeOf<OAuthProviderConfig['clientId']>().toBeString();
+    expectTypeOf<OAuthProviderConfig['authorizationEndpoint']>().toBeString();
+    expectTypeOf<OAuthProviderConfig['tokenEndpoint']>().toBeString();
+    expectTypeOf<OAuthProviderConfig['redirectUri']>().toBeString();
+    expectTypeOf<OAuthProviderConfig['scopes']>().toEqualTypeOf<string[]>();
+    expectTypeOf<OAuthProviderConfig['extraAuthParams']>().toEqualTypeOf<Record<string, string> | undefined>();
+  });
+
+  it('PendingAuthState has expected structure', () => {
+    expectTypeOf<PendingAuthState['providerId']>().toEqualTypeOf<ProviderId>();
+    expectTypeOf<PendingAuthState['codeVerifier']>().toBeString();
+    expectTypeOf<PendingAuthState['state']>().toBeString();
+    expectTypeOf<PendingAuthState['createdAt']>().toBeNumber();
   });
 });

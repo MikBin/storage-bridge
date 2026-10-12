@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { DropboxProvider } from '../dropbox-provider.js';
 import { createDropboxApiMock } from './dropbox-api-mock.js';
-import type { OAuthClient, OAuthTokens } from '@storage-bridge/auth-web';
+import type { OAuthClient, OAuthTokens } from '@storage-bridge/core';
 import { ConflictError, AuthRequiredError, SettingsStoreError } from '@storage-bridge/core';
 
 const noopFetch = (() => Promise.resolve(new Response())) as unknown as typeof fetch;

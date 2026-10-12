@@ -1,4 +1,4 @@
-import type { OAuthClient, OAuthTokens, OAuthProviderConfig } from './types.js';
+import type { OAuthClient, OAuthTokens, OAuthProviderConfig } from '@storage-bridge/core';
 import type { TokenStore } from './token-store.js';
 import type { CallbackResult } from './redirect-handler.js';
 import { LocalStorageTokenStore } from './token-store.js';

@@ -1,7 +1,7 @@
 import { describeProviderContract, type ContractFamily } from '@storage-bridge/testing';
 import { DropboxProvider } from '../dropbox-provider.js';
 import { createDropboxApiMock } from './dropbox-api-mock.js';
-import type { OAuthClient, OAuthTokens } from '@storage-bridge/auth-web';
+import type { OAuthClient, OAuthTokens } from '@storage-bridge/core';
 
 /**
  * Honest harness: the unmodified DropboxProvider runs the shared suite against

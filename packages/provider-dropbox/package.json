@@ -20,11 +20,7 @@
   "dependencies": {
     "@storage-bridge/core": "workspace:*"
   },
-  "peerDependencies": {
-    "@storage-bridge/auth-web": "workspace:*"
-  },
   "devDependencies": {
-    "@storage-bridge/auth-web": "workspace:*",
     "@storage-bridge/eslint-config": "workspace:*",
     "@storage-bridge/testing": "workspace:*",
     "@storage-bridge/typescript-config": "workspace:*",

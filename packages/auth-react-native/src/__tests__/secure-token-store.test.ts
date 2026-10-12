@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { SecureTokenStore } from '../secure-token-store.js';
-import type { OAuthTokens } from '@storage-bridge/auth-web';
+import type { OAuthTokens } from '@storage-bridge/core';
 
 vi.mock('expo-secure-store', () => ({
   getItemAsync: vi.fn(),

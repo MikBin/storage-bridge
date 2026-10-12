@@ -1,7 +1,7 @@
 import { describeProviderContract, type ContractFamily } from '@storage-bridge/testing';
 import { GoogleDriveProvider } from '../google-drive-provider.js';
 import { createDriveApiMock } from './google-drive-api-mock.js';
-import type { OAuthClient, OAuthTokens } from '@storage-bridge/auth-web';
+import type { OAuthClient, OAuthTokens } from '@storage-bridge/core';
 
 /**
  * Honest harness: the unmodified GoogleDriveProvider runs the shared suite

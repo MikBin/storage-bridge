@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ReactNativeOAuthClient } from '../oauth-client.js';
 import type { ReactNativeOAuthConfig } from '../types.js';
-import type { OAuthTokens } from '@storage-bridge/auth-web';
+import type { OAuthTokens } from '@storage-bridge/core';
 
 const secureStoreMocks = {
   getItemAsync: vi.fn(),

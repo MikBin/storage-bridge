@@ -1,4 +1,4 @@
-import type { OAuthClient, OAuthTokens } from '@storage-bridge/auth-web';
+import type { OAuthClient, OAuthTokens } from '@storage-bridge/core';
 import { requireTokenEndpointSuccess } from '@storage-bridge/auth-web';
 import type { ReactNativeOAuthConfig } from './types.js';
 import { AuthRequest } from 'expo-auth-session';

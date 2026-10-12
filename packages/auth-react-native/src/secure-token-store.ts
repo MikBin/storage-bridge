@@ -1,4 +1,4 @@
-import type { OAuthTokens } from '@storage-bridge/auth-web';
+import type { OAuthTokens } from '@storage-bridge/core';
 
 /**
  * Structural surface of the expo-secure-store module that SecureTokenStore
