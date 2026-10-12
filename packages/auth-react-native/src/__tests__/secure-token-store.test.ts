@@ -22,7 +22,7 @@ describe('SecureTokenStore', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    store = new SecureTokenStore();
+    store = new SecureTokenStore(SecureStore);
   });
 
   it('returns null for missing provider', async () => {
