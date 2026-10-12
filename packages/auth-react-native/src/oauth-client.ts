@@ -1,10 +1,12 @@
 import type { OAuthClient, OAuthTokens } from '@storage-bridge/core';
-import { TokenManager } from '@storage-bridge/core';
+import { TokenManager, isPendingStateUsable } from '@storage-bridge/core';
 import type { ReactNativeOAuthConfig } from './types.js';
 import { AuthRequest } from 'expo-auth-session';
 import { AuthRequiredError } from '@storage-bridge/core';
 import { SecureTokenStore } from './secure-token-store.js';
 import type { SecureStoreModule } from './secure-token-store.js';
+import type { ParsedCallback } from './deep-link-handler.js';
+import { consumePendingState } from './deep-link-handler.js';
 
 const NO_VIABLE_SECURE_STORE_MESSAGE =
   'No viable secure token store is available: the optional dependency expo-secure-store could not be resolved. ' +
@@ -118,6 +120,27 @@ export class ReactNativeOAuthClient implements OAuthClient {
     }
 
     await this.tokens.exchangeAuthorizationCode(code, request.codeVerifier);
+  }
+
+  /**
+   * Completes a login from a parsed deep-link callback (03-04): provider
+   * errors and non-callbacks reject as AuthRequiredError without touching
+   * the token endpoint. A callback proceeds only when its pending state
+   * (saved via savePendingState before the browser session opened) matches
+   * this provider and is younger than PENDING_STATE_TTL_MS — stale-state
+   * replay cannot complete the code exchange.
+   */
+  async completeAuthFlow(callback: ParsedCallback): Promise<void> {
+    if (!callback || callback.kind === 'error') {
+      throw new AuthRequiredError(this.config.providerId);
+    }
+
+    const pending = consumePendingState(callback.state);
+    if (!pending || !isPendingStateUsable(pending, this.config.providerId, Date.now())) {
+      throw new AuthRequiredError(this.config.providerId);
+    }
+
+    await this.tokens.exchangeAuthorizationCode(callback.code, pending.codeVerifier);
   }
 
   logout(): Promise<void> {

@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ReactNativeOAuthClient } from '../oauth-client.js';
+import { savePendingState } from '../deep-link-handler.js';
 import type { ReactNativeOAuthConfig } from '../types.js';
-import { AuthRequiredError } from '@storage-bridge/core';
-import type { OAuthTokens } from '@storage-bridge/core';
+import { AuthRequiredError, PENDING_STATE_TTL_MS } from '@storage-bridge/core';
+import type { OAuthTokens, PendingAuthState } from '@storage-bridge/core';
 
 const mockConfig: ReactNativeOAuthConfig = {
   providerId: 'google-drive',
@@ -328,6 +329,108 @@ describe('ReactNativeOAuthClient', () => {
         json: async () => ({ access_token: 'refreshed-native-token', expires_in: 3600, token_type: 'Bearer' }),
       });
       await expect(client.getAccessToken()).resolves.toBe('refreshed-native-token');
+    });
+  });
+
+  describe('completeAuthFlow() pending-state validation (03-04 deep-link completion)', () => {
+    // bypass: fast-check not installed; deterministic rejection matrix at the
+    // RN consumption boundary (providerId mismatch, expired createdAt, error
+    // callback, not-a-callback, stale-state replay). Every rejection path
+    // must leave the token endpoint untouched: validation happens BEFORE the
+    // code exchange, mirroring the web completeAuthFlow.
+    async function captureRejection(operation: Promise<unknown>): Promise<unknown> {
+      try {
+        await operation;
+      } catch (error) {
+        return error;
+      }
+      throw new Error('Expected the operation to reject, but it resolved');
+    }
+
+    function seedPendingState(overrides: Partial<PendingAuthState> = {}): void {
+      savePendingState({
+        providerId: 'google-drive',
+        codeVerifier: 'native-verifier-03-04',
+        state: 'native-state-03-04',
+        createdAt: Date.now(),
+        ...overrides,
+      });
+    }
+
+    function successResponse(): unknown {
+      return {
+        ok: true,
+        json: async () => ({ access_token: 'native-new-access', refresh_token: 'native-new-refresh', expires_in: 3600, token_type: 'Bearer' }),
+      };
+    }
+
+    it('exchanges the code with the stored verifier on a fresh matching pending state', async () => {
+      seedPendingState({ state: 'native-ok-state', codeVerifier: 'verifier-ok' });
+      mockFetch.mockResolvedValueOnce(successResponse());
+
+      await expect(
+        client.completeAuthFlow({ kind: 'callback', code: 'native-code', state: 'native-ok-state' }),
+      ).resolves.toBeUndefined();
+
+      const body = new URLSearchParams(mockFetch.mock.calls[0][1].body as string);
+      expect(body.get('grant_type')).toBe('authorization_code');
+      expect(body.get('code')).toBe('native-code');
+      expect(body.get('code_verifier')).toBe('verifier-ok');
+      expect(mockTokenStore.set).toHaveBeenCalledWith(
+        'google-drive',
+        expect.objectContaining({ accessToken: 'native-new-access' }),
+      );
+    });
+
+    it('rejects a providerId mismatch without touching the token endpoint', async () => {
+      seedPendingState({ providerId: 'dropbox', state: 'native-mismatch-state' });
+
+      const error = await captureRejection(
+        client.completeAuthFlow({ kind: 'callback', code: 'c', state: 'native-mismatch-state' }),
+      );
+
+      expect(error).toBeInstanceOf(AuthRequiredError);
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it('rejects an expired createdAt (past the 10-minute TTL) without touching the token endpoint', async () => {
+      seedPendingState({ state: 'native-expired-state', createdAt: Date.now() - PENDING_STATE_TTL_MS - 60_000 });
+
+      const error = await captureRejection(
+        client.completeAuthFlow({ kind: 'callback', code: 'c', state: 'native-expired-state' }),
+      );
+
+      expect(error).toBeInstanceOf(AuthRequiredError);
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it('rejects an error callback without touching the token endpoint', async () => {
+      const error = await captureRejection(
+        client.completeAuthFlow({ kind: 'error', error: 'access_denied', error_description: 'User denied access' }),
+      );
+
+      expect(error).toBeInstanceOf(AuthRequiredError);
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it('rejects null (not a callback) without touching the token endpoint', async () => {
+      const error = await captureRejection(client.completeAuthFlow(null));
+
+      expect(error).toBeInstanceOf(AuthRequiredError);
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it('stale-state replay: the same state cannot complete login twice', async () => {
+      seedPendingState();
+      mockFetch.mockResolvedValueOnce(successResponse());
+
+      await client.completeAuthFlow({ kind: 'callback', code: 'c1', state: 'native-state-03-04' });
+      const replay = await captureRejection(
+        client.completeAuthFlow({ kind: 'callback', code: 'c2', state: 'native-state-03-04' }),
+      );
+
+      expect(replay).toBeInstanceOf(AuthRequiredError);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
     });
   });
 });

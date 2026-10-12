@@ -1,5 +1,5 @@
 import type { OAuthClient, OAuthProviderConfig, OAuthTokens } from '@storage-bridge/core';
-import { TokenManager } from '@storage-bridge/core';
+import { TokenManager, isPendingStateUsable } from '@storage-bridge/core';
 import type { TokenStore } from './token-store.js';
 import type { CallbackResult } from './redirect-handler.js';
 import { LocalStorageTokenStore } from './token-store.js';
@@ -67,9 +67,20 @@ export class BrowserOAuthClient implements OAuthClient {
     window.location.assign(authUrl);
   }
 
+  /**
+   * Completes a login from a discriminated callback result (03-04): provider
+   * errors and non-callbacks reject as AuthRequiredError without touching
+   * the token endpoint. A callback proceeds only when its pending state
+   * matches this provider and is younger than PENDING_STATE_TTL_MS —
+   * stale-state replay cannot complete the code exchange.
+   */
   async completeAuthFlow(result: CallbackResult): Promise<void> {
+    if (!result || result.kind === 'error') {
+      throw new AuthRequiredError(this.config.providerId);
+    }
+
     const pending = consumePendingState(result.state);
-    if (!pending) {
+    if (!pending || !isPendingStateUsable(pending, this.config.providerId, Date.now())) {
       throw new AuthRequiredError(this.config.providerId);
     }
 

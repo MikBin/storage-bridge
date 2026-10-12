@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { BrowserOAuthClient } from '../oauth-client.js';
-import type { OAuthProviderConfig, OAuthTokens } from '../types.js';
-import { AuthRequiredError } from '@storage-bridge/core';
+import { savePendingState } from '../redirect-handler.js';
+import type { OAuthProviderConfig, OAuthTokens, PendingAuthState } from '../types.js';
+import { AuthRequiredError, PENDING_STATE_TTL_MS } from '@storage-bridge/core';
 
 const mockConfig: OAuthProviderConfig = {
   providerId: 'google-drive',
@@ -147,7 +148,7 @@ describe('BrowserOAuthClient', () => {
         }),
       });
 
-      await client.completeAuthFlow({ success: true, code: 'auth-code', state: 'test-state' });
+      await client.completeAuthFlow({ kind: 'callback', code: 'auth-code', state: 'test-state' });
 
       expect(mockFetch).toHaveBeenCalledWith(
         mockConfig.tokenEndpoint,
@@ -206,7 +207,7 @@ describe('BrowserOAuthClient', () => {
     }
 
     function completeAuthFlowCall(): Promise<unknown> {
-      return client.completeAuthFlow({ success: true, code: 'auth-code', state: 'test-state' });
+      return client.completeAuthFlow({ kind: 'callback', code: 'auth-code', state: 'test-state' });
     }
 
     function seedRefreshableTokens(): void {
@@ -348,6 +349,111 @@ describe('BrowserOAuthClient', () => {
         json: async () => ({ access_token: 'a2', expires_in: 3600, token_type: 'Bearer' }),
       });
       await expect(refreshCall()).resolves.toBe('a2');
+    });
+  });
+
+  describe('completeAuthFlow() pending-state validation (03-04)', () => {
+    // bypass: fast-check not installed; deterministic rejection matrix at the
+    // consumption boundary (providerId mismatch, expired createdAt, unknown
+    // state, stale-state replay, error callback, not-a-callback). Every
+    // rejection path must leave the token endpoint untouched: validation
+    // happens BEFORE the code exchange.
+    async function captureRejection(operation: Promise<unknown>): Promise<unknown> {
+      try {
+        await operation;
+      } catch (error) {
+        return error;
+      }
+      throw new Error('Expected the operation to reject, but it resolved');
+    }
+
+    function seedPendingState(overrides: Partial<PendingAuthState> = {}): void {
+      savePendingState({
+        providerId: 'google-drive',
+        codeVerifier: 'verifier-03-04',
+        state: 'state-03-04',
+        createdAt: Date.now(),
+        ...overrides,
+      });
+    }
+
+    function successResponse(): unknown {
+      return {
+        ok: true,
+        json: async () => ({ access_token: 'new-access', refresh_token: 'new-refresh', expires_in: 3600, token_type: 'Bearer' }),
+      };
+    }
+
+    it('rejects a providerId mismatch without touching the token endpoint', async () => {
+      seedPendingState({ providerId: 'dropbox', state: 'mismatch-state' });
+
+      const error = await captureRejection(
+        client.completeAuthFlow({ kind: 'callback', code: 'c', state: 'mismatch-state' }),
+      );
+
+      expect(error).toBeInstanceOf(AuthRequiredError);
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it('rejects an expired createdAt (past the 10-minute TTL) without touching the token endpoint', async () => {
+      seedPendingState({ state: 'expired-state', createdAt: Date.now() - PENDING_STATE_TTL_MS - 60_000 });
+
+      const error = await captureRejection(
+        client.completeAuthFlow({ kind: 'callback', code: 'c', state: 'expired-state' }),
+      );
+
+      expect(error).toBeInstanceOf(AuthRequiredError);
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it('completes the exchange for a matching pending state within the TTL window', async () => {
+      seedPendingState({ state: 'fresh-state', createdAt: Date.now() - (PENDING_STATE_TTL_MS - 60_000) });
+      mockFetch.mockResolvedValueOnce(successResponse());
+
+      await expect(
+        client.completeAuthFlow({ kind: 'callback', code: 'c', state: 'fresh-state' }),
+      ).resolves.toBeUndefined();
+
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      expect(mockTokenStore.set).toHaveBeenCalledWith('google-drive', expect.objectContaining({ accessToken: 'new-access' }));
+    });
+
+    it('rejects an unknown state (never saved) without touching the token endpoint', async () => {
+      const error = await captureRejection(
+        client.completeAuthFlow({ kind: 'callback', code: 'c', state: 'never-saved' }),
+      );
+
+      expect(error).toBeInstanceOf(AuthRequiredError);
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it('stale-state replay: the same state cannot complete login twice', async () => {
+      seedPendingState();
+      mockFetch.mockResolvedValueOnce(successResponse());
+
+      await client.completeAuthFlow({ kind: 'callback', code: 'c1', state: 'state-03-04' });
+      const replay = await captureRejection(
+        client.completeAuthFlow({ kind: 'callback', code: 'c2', state: 'state-03-04' }),
+      );
+
+      expect(replay).toBeInstanceOf(AuthRequiredError);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('rejects an error callback without touching the token endpoint', async () => {
+      const error = await captureRejection(
+        client.completeAuthFlow({ kind: 'error', error: 'access_denied', error_description: 'User denied access' }),
+      );
+
+      expect(error).toBeInstanceOf(AuthRequiredError);
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it('rejects a null result (not a callback) without touching the token endpoint', async () => {
+      const error = await captureRejection(client.completeAuthFlow(null));
+
+      expect(error).toBeInstanceOf(AuthRequiredError);
+      expect(mockFetch).not.toHaveBeenCalled();
     });
   });
 });

@@ -298,6 +298,80 @@ describe('TokenManager (03-03 shared token lifecycle)', () => {
       });
     });
 
+    describe('single-flight refresh (03-04)', () => {
+      // bypass: fast-check not installed; deterministic concurrency matrix
+      // N ∈ {2,5,20} over the token-state universe {access, refresh, expiry}.
+      // Contract: exactly one refresh call reaches the endpoint, every caller
+      // resolves with the same rotated token set, and the store is never
+      // cleared when the rotation succeeds (no spurious logout).
+      const CONCURRENCY_LEVELS = [2, 5, 20] as const;
+
+      it.each(CONCURRENCY_LEVELS)(
+        'N=%i concurrent getAccessToken() near expiry share one refresh; all resolve with the same rotated tokens',
+        async (n) => {
+          const { manager, store, fetchFn } = makeManager({ asyncBacked });
+          await store.set(PROVIDER_ID, nearExpiryTokens());
+          fetchFn.mockResolvedValue(tokenEndpointSuccess());
+
+          const results = await Promise.all(Array.from({ length: n }, () => manager.getAccessToken()));
+
+          expect(fetchFn).toHaveBeenCalledTimes(1);
+          expect(new Set(results)).toEqual(new Set(['new-access']));
+          expect(snapshot(store)).toEqual({ access: 'new-access', refresh: 'new-refresh', expiry: NOW + 1_800_000 });
+        },
+      );
+
+      it.each(CONCURRENCY_LEVELS)(
+        'N=%i concurrent refreshes rejected with 400 invalid_grant: all reject AuthRequiredError, store cleared exactly once',
+        async (n) => {
+          const { manager, store, fetchFn } = makeManager({ asyncBacked });
+          await store.set(PROVIDER_ID, nearExpiryTokens());
+          const removeSpy = vi.spyOn(store, 'remove');
+          fetchFn.mockResolvedValue(tokenEndpointFailure(400));
+
+          const outcomes = await Promise.allSettled(Array.from({ length: n }, () => manager.getAccessToken()));
+
+          for (const outcome of outcomes) {
+            expect(outcome.status).toBe('rejected');
+            expect((outcome as PromiseRejectedResult).reason).toBeInstanceOf(AuthRequiredError);
+          }
+          expect(fetchFn).toHaveBeenCalledTimes(1);
+          expect(removeSpy).toHaveBeenCalledTimes(1);
+          expect(snapshot(store)).toEqual({ access: undefined, refresh: undefined, expiry: undefined });
+        },
+      );
+
+      it.each(CONCURRENCY_LEVELS)(
+        'N=%i concurrent refreshes failing with HTTP 500: all reject AuthExchangeError, grant preserved (no spurious logout)',
+        async (n) => {
+          const { manager, store, fetchFn } = makeManager({ asyncBacked });
+          await store.set(PROVIDER_ID, nearExpiryTokens());
+          fetchFn.mockResolvedValue(tokenEndpointFailure(500));
+
+          const outcomes = await Promise.allSettled(Array.from({ length: n }, () => manager.getAccessToken()));
+
+          for (const outcome of outcomes) {
+            expect(outcome.status).toBe('rejected');
+            expect((outcome as PromiseRejectedResult).reason).toBeInstanceOf(AuthExchangeError);
+          }
+          expect(fetchFn).toHaveBeenCalledTimes(1);
+          expect(snapshot(store)).toEqual({ access: 'stored-access', refresh: 'stored-refresh', expiry: NOW + 30_000 });
+        },
+      );
+
+      it('a sequential read after rotation sees the persisted fresh tokens without a second refresh', async () => {
+        const { manager, store, fetchFn } = makeManager({ asyncBacked });
+        await store.set(PROVIDER_ID, nearExpiryTokens());
+        fetchFn.mockResolvedValue(tokenEndpointSuccess());
+
+        await expect(manager.getAccessToken()).resolves.toBe('new-access');
+        await expect(manager.getAccessToken()).resolves.toBe('new-access');
+
+        expect(fetchFn).toHaveBeenCalledTimes(1);
+        expect(snapshot(store)).toEqual({ access: 'new-access', refresh: 'new-refresh', expiry: NOW + 1_800_000 });
+      });
+    });
+
     describe('refresh rotation semantics', () => {
       it('keeps the previous refresh token when the response omits refresh_token', async () => {
         const { manager, store, fetchFn } = makeManager({ asyncBacked });
@@ -427,6 +501,36 @@ describe('TokenManager (03-03 shared token lifecycle)', () => {
       await expect(manager.getAccessToken()).resolves.toBe('new-access');
 
       expect(snapshot(store)).toEqual({ access: 'new-access', refresh: 'new-refresh', expiry: NOW + 5_000 + 120_000 });
+    });
+  });
+
+  describe('pending-state validation (03-04)', () => {
+    it('exports the 10-minute TTL constant and the pure validator', () => {
+      expect(oauth.PENDING_STATE_TTL_MS).toBe(600_000);
+      expect(oauth.isPendingStateUsable).toBeTypeOf('function');
+    });
+
+    // bypass: fast-check not installed; deterministic age/provider matrix
+    // with explicit boundary ages (0, inside, TTL, TTL+1, negative) over the
+    // pure validator — the single implementation consumed by both runtimes'
+    // completeAuthFlow paths.
+    function pending(createdAt: number, providerId: string = PROVIDER_ID): oauth.PendingAuthState {
+      return { providerId: providerId as oauth.PendingAuthState['providerId'], codeVerifier: 'verifier', state: 'state-1', createdAt };
+    }
+
+    it('accepts a matching provider with an age within the TTL window', () => {
+      expect(oauth.isPendingStateUsable(pending(NOW), PROVIDER_ID, NOW)).toBe(true);
+      expect(oauth.isPendingStateUsable(pending(NOW - 599_999), PROVIDER_ID, NOW)).toBe(true);
+    });
+
+    it('rejects a providerId mismatch regardless of age', () => {
+      expect(oauth.isPendingStateUsable(pending(NOW, 'dropbox'), PROVIDER_ID, NOW)).toBe(false);
+    });
+
+    it('rejects ages past the TTL boundary, future-dated createdAt, and non-finite createdAt', () => {
+      expect(oauth.isPendingStateUsable(pending(NOW - 600_001), PROVIDER_ID, NOW)).toBe(false);
+      expect(oauth.isPendingStateUsable(pending(NOW + 1), PROVIDER_ID, NOW)).toBe(false);
+      expect(oauth.isPendingStateUsable(pending(Number.NaN), PROVIDER_ID, NOW)).toBe(false);
     });
   });
 

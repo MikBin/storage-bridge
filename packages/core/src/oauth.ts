@@ -34,6 +34,32 @@ export interface PendingAuthState {
 }
 
 /**
+ * Maximum age of a PendingAuthState accepted at consumption (03-04). A
+ * pending login older than this is stale: the authorization code may have
+ * been replayed or the flow abandoned, so the app must restart the login
+ * instead of exchanging the code.
+ */
+export const PENDING_STATE_TTL_MS = 600_000;
+
+/**
+ * Pure pending-state validation applied at consumption (03-04): the pending
+ * state must belong to the provider completing the flow and must have been
+ * created no earlier than PENDING_STATE_TTL_MS ago. A future-dated or
+ * non-finite createdAt is rejected outright. Returns true when the pending
+ * state may proceed to the code exchange.
+ */
+export function isPendingStateUsable(
+  pending: PendingAuthState,
+  expectedProviderId: ProviderId,
+  now: number,
+): boolean {
+  if (pending.providerId !== expectedProviderId) return false;
+  if (typeof pending.createdAt !== 'number' || !Number.isFinite(pending.createdAt)) return false;
+  const age = now - pending.createdAt;
+  return age >= 0 && age <= PENDING_STATE_TTL_MS;
+}
+
+/**
  * Persistence port for OAuth tokens (03-03). Runtimes supply their own
  * adapter: synchronous localStorage-backed stores on the web, promise-backed
  * secure stores on react-native. Both shapes are accepted; the TokenManager
@@ -119,6 +145,8 @@ export class TokenManager {
   private readonly tokenStore: TokenStore;
   private readonly fetchFn: typeof fetch;
   private readonly now: () => number;
+  /** In-flight refresh shared by all concurrent callers (03-04). */
+  private inFlightRefresh: Promise<string> | null = null;
 
   constructor(options: TokenManagerOptions) {
     this.config = options.config;
@@ -206,7 +234,29 @@ export class TokenManager {
     await Promise.resolve(this.tokenStore.remove(this.config.providerId));
   }
 
-  private async refreshTokens(tokens: OAuthTokens): Promise<string> {
+  /**
+   * Single-flight refresh (03-04): concurrent getAccessToken() callers near
+   * expiry share one in-flight rotation instead of each posting a refresh —
+   * under refresh-token rotation the losers would send the already
+   * invalidated token, receive invalid_grant, clear the store, and spuriously
+   * log the user out. All awaiters resolve with the same rotated access token
+   * or share the same failure (AuthRequiredError clears the store exactly
+   * once, from the single rotation); the slot is released when the rotation
+   * settles so the next caller reads the persisted fresh state.
+   */
+  private refreshTokens(tokens: OAuthTokens): Promise<string> {
+    if (this.inFlightRefresh) {
+      return this.inFlightRefresh;
+    }
+
+    const refresh = this.doRefreshTokens(tokens).finally(() => {
+      this.inFlightRefresh = null;
+    });
+    this.inFlightRefresh = refresh;
+    return refresh;
+  }
+
+  private async doRefreshTokens(tokens: OAuthTokens): Promise<string> {
     if (!tokens.refreshToken) {
       await Promise.resolve(this.tokenStore.remove(this.config.providerId));
       throw new AuthRequiredError(this.config.providerId);
