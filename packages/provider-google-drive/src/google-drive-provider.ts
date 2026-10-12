@@ -82,7 +82,8 @@ export class GoogleDriveProvider extends FileBackedDocumentProvider {
     // (documentation owned by step 04-02). `force` skips the check entirely.
     if (!options?.force && options?.expectedRevision !== undefined) {
       if (!existing || existing.revision !== options.expectedRevision) {
-        throw new ConflictError(fileName);
+        // Payload is the caller's logical key, never the encoded remote name.
+        throw new ConflictError(this.fileNameToKey(fileName));
       }
     }
 

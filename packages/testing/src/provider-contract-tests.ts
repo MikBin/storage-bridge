@@ -41,10 +41,13 @@ export const FAMILY_OWNERS: Readonly<Record<ContractFamily, string>> = {
  * Families a fresh provider implementation is expected to violate until the
  * owning remediation step lands. Used when a caller provides no explicit
  * `pendingFamilies`. Replaced (not merged) by an explicit list.
+ *
+ * 'conflict-payload' left this default when its owning step (02-05) landed:
+ * ConflictError now carries the logical key, and every provider built on the
+ * shared file/record-backed bases satisfies the family by construction.
  */
 export const DEFAULT_PENDING_FAMILIES: readonly ContractFamily[] = [
   'disconnected-operations',
-  'conflict-payload',
   'error-taxonomy',
   'pagination',
   'server-errors',

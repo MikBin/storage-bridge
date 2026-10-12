@@ -13,7 +13,6 @@ import type { OAuthClient, OAuthTokens } from '@storage-bridge/auth-web';
  */
 const PENDING_FAMILIES: readonly ContractFamily[] = [
   'disconnected-operations', // 02-04: provider performs requests without a connection guard
-  'conflict-payload',        // 02-05: ConflictError carries the encoded filename, no logical-key payload
 ];
 
 const api = createOneDriveApiMock();

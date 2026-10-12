@@ -14,7 +14,6 @@ import type { OAuthClient, OAuthTokens } from '@storage-bridge/auth-web';
  */
 const PENDING_FAMILIES: readonly ContractFamily[] = [
   'disconnected-operations', // 02-04: reads before connect() resolve to null instead of rejecting
-  'conflict-payload',        // 02-05: ConflictError carries the encoded filename, no logical-key payload
 ];
 
 /**

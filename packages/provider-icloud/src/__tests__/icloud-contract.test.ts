@@ -27,7 +27,6 @@ const PENDING_FAMILIES: readonly ContractFamily[] = [
   'honest-lifecycle',        // 02-08: provider fabricates connect/isConnected/getProfile state
   'error-taxonomy',          // 02-06: disconnected reads resolve instead of rejecting
   'disconnected-operations', // 02-04: operations succeed before connect()
-  'conflict-payload',        // 02-05: ConflictError carries no logical-key payload
 ];
 
 describeProviderContract('ICloudProvider', () => createHarness(), {

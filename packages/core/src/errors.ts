@@ -27,7 +27,12 @@ export class DocumentNotFoundError extends SettingsStoreError {
 }
 
 export class ConflictError extends SettingsStoreError {
-  constructor(key: string) {
+  /**
+   * The logical (unencoded) document key the caller used — the payload
+   * surface consumers match conflicts against (provider contract family
+   * 'conflict-payload'). Encoded storage filenames never leak to callers.
+   */
+  constructor(public readonly key: string) {
     super(`Revision conflict for: ${key}`, 'CONFLICT');
     this.name = 'ConflictError';
   }

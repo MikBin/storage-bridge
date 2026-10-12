@@ -78,7 +78,8 @@ export class DropboxProvider extends FileBackedDocumentProvider {
       body,
     });
 
-    if (res.status === 409) throw new ConflictError(fileName);
+    // Payload is the caller's logical key, never the encoded remote name.
+    if (res.status === 409) throw new ConflictError(this.fileNameToKey(fileName));
     if (res.status === 401 || res.status === 403) throw new AuthRequiredError(this.id);
     if (!res.ok) throw new SettingsStoreError(`Dropbox write failed: ${res.status}`, 'DROPBOX_WRITE_ERROR');
 

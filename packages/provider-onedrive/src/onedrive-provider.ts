@@ -78,7 +78,8 @@ export class OneDriveProvider extends FileBackedDocumentProvider {
       body,
     });
 
-    if (res.status === 412) throw new ConflictError(fileName);
+    // Payload is the caller's logical key, never the encoded remote name.
+    if (res.status === 412) throw new ConflictError(this.fileNameToKey(fileName));
     if (res.status === 401 || res.status === 403) throw new AuthRequiredError(this.id);
     if (!res.ok) throw new SettingsStoreError(`OneDrive write failed: ${res.status}`, 'ONEDRIVE_WRITE_ERROR');
 

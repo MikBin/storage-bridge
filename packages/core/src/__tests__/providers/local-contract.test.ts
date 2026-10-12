@@ -17,11 +17,11 @@ import { LocalDocumentStoreProvider } from '../../providers/local-document-store
  *   semantics (force skips the revision precondition).
  * - 'error-taxonomy' runs actively: local rejections are NotConnectedError /
  *   ConflictError, both SettingsStoreError carrying a code.
- * - 'conflict-payload' stays an expected-fail scaffold owned by 02-05.
+ * - 'conflict-payload' runs actively as of 02-05 (this step owns the family):
+ *   ConflictError exposes the logical key it already carried, never an
+ *   encoded storage filename.
  */
-const PENDING_FAMILIES: readonly ContractFamily[] = [
-  'conflict-payload', // 02-05: ConflictError does not yet carry the logical-key payload
-];
+const PENDING_FAMILIES: readonly ContractFamily[] = [];
 
 describeProviderContract('LocalDocumentStoreProvider', () => new LocalDocumentStoreProvider(), {
   pendingFamilies: PENDING_FAMILIES,
