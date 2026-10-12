@@ -2,9 +2,10 @@
   "name": "@storage-bridge/eslint-config",
   "version": "1.0.0",
   "type": "module",
+  "main": "index.js",
   "dependencies": {
-    "@eslint/js": "latest",
-    "eslint": "latest",
-    "typescript-eslint": "latest"
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.2.0",
+    "typescript-eslint": "^8.58.2"
   }
 }

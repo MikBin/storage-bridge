@@ -21,8 +21,6 @@ function generateETag(): string {
   return `"{{etag-${nextETag++}}}"`;
 }
 
-const GRAPH_BASE = 'https://graph.microsoft.com/v1.0/me/drive/special/approot';
-
 /**
  * Create a mock fetch function that simulates Microsoft Graph API v1.0 endpoints
  * for the OneDrive app folder.

@@ -1,7 +1,6 @@
 import { vi } from 'vitest';
 
 export interface MockCloudKitState {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   records: Record<string, any>;
   counter: number;
 }
@@ -52,7 +51,6 @@ export function createCloudKitApiMock(initialState: MockCloudKitState = { record
       if (urlStr.includes('/records/modify')) {
         // Handle modify (save/delete)
         const operations = body?.operations || [];
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const results = operations.map((op: any) => {
           const { operationType, record } = op;
           const { recordName, recordChangeTag } = record;

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { FileEntry } from '../providers/file-backed-document-provider.js';
 import { FileBackedDocumentProvider } from '../providers/file-backed-document-provider.js';
-import type { ProviderId, PutOptions, SettingsEnvelope, SettingsSummary, ConnectedProfile } from '../types.js';
+import type { ProviderId, PutOptions, ConnectedProfile } from '../types.js';
 
 class InMemoryFileProvider extends FileBackedDocumentProvider {
   readonly id: ProviderId = 'local';
@@ -19,7 +19,6 @@ class InMemoryFileProvider extends FileBackedDocumentProvider {
   }
 
   protected async writeFile(fileName: string, text: string, _options?: PutOptions): Promise<FileEntry> {
-    const existing = this.store.get(fileName);
     this.revCounter++;
     const meta: FileEntry = {
       id: `${fileName}-${this.revCounter}`,
