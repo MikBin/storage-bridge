@@ -3,11 +3,13 @@
 This file tracks the outstanding tasks required to bring the Storage Bridge project to a production-ready state.
 
 ## 1. Backlog Synchronization
+
 - [x] Update status to `Done` in backlog task files
 - [x] Move completed tasks from [tasks](file:///c:/Users/miche/Documents/projects/storage-bridge/backlog/tasks) to [completed](file:///c:/Users/miche/Documents/projects/storage-bridge/backlog/completed)
   - Tasks: 3, 5, 6, 8, 9, 10, 11, 12, 13, 14
 
 ## 2. Missing Features & Documentation
+
 - [x] Implement interactive playground app (`TASK-15`) in `apps/playground`
   - Allows manual verification of CRUD settings across providers
 - [/] Build end-to-end usage example apps (`TASK-16`)
@@ -19,11 +21,13 @@ This file tracks the outstanding tasks required to bring the Storage Bridge proj
 - [x] Compile API references from TSDoc comments (`apps/docs`)
 
 ## 3. Code Quality & Type Safety (Address ANY_USAGE_REPORT.md)
+
 - [x] Eliminate `any` casts in tests by changing provider methods to `public`
 - [x] Type external API boundaries with formal DTO structures (e.g., CloudKit client)
 - [x] Replace remaining instances of `any` with `unknown` or explicit types (completed with MockFileBackedProvider.writeFile fix)
 
 ## 4. DevOps & Release Engineering
+
 - [ ] Build CI/CD pipeline (e.g., GitHub Actions) to automate:
   - `pnpm lint`
   - `pnpm typecheck`

@@ -15,12 +15,11 @@
     "@storage-bridge/auth-web": "workspace:*",
     "@storage-bridge/provider-google-drive": "workspace:*",
     "@storage-bridge/provider-dropbox": "workspace:*",
-    "@storage-bridge/provider-onedrive": "workspace:*",
-    "@storage-bridge/provider-icloud": "workspace:*"
+    "@storage-bridge/provider-onedrive": "workspace:*"
   },
   "devDependencies": {
     "vite": "^5.0.0",
-    "typescript": "latest",
+    "typescript": "^6.0.2",
     "@storage-bridge/eslint-config": "workspace:*",
     "@storage-bridge/typescript-config": "workspace:*"
   }

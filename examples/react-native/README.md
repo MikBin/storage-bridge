@@ -21,11 +21,13 @@ Ensure you have Node.js, `pnpm`, and `expo-cli` installed.
 ### Setup and Start
 
 1. Install dependencies from the project root:
+
    ```bash
    pnpm install
    ```
 
 2. Start the Expo development server:
+
    ```bash
    pnpm --filter @storage-bridge/example-react-native start
    ```
@@ -41,6 +43,7 @@ Ensure you have Node.js, `pnpm`, and `expo-cli` installed.
 To test Google Drive or OneDrive sync:
 
 ### 1. Google Drive
+
 1. Go to the [Google Cloud Console](https://console.cloud.google.com/).
 2. Create an **OAuth Client ID** for **iOS** or **Android**.
 3. Set the **Redirect URI** to:
@@ -49,6 +52,7 @@ To test Google Drive or OneDrive sync:
 4. Input the Client ID and Redirect URI in the app settings, then click **Connect Provider**.
 
 ### 2. OneDrive
+
 1. Go to the [Microsoft Entra Admin Center / Azure Portal](https://portal.azure.com/).
 2. Register an application.
 3. In **Authentication**, add a Platform for **Mobile and desktop applications**.

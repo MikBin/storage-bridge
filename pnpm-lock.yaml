@@ -56,7 +56,7 @@ importers:
         specifier: ^0.26.11
         version: 0.26.11(typescript@6.0.3)
       typescript:
-        specifier: latest
+        specifier: ^6.0.2
         version: 6.0.3
 
   apps/playground:
@@ -73,9 +73,6 @@ importers:
       '@storage-bridge/provider-google-drive':
         specifier: workspace:*
         version: link:../../packages/provider-google-drive
-      '@storage-bridge/provider-icloud':
-        specifier: workspace:*
-        version: link:../../packages/provider-icloud
       '@storage-bridge/provider-onedrive':
         specifier: workspace:*
         version: link:../../packages/provider-onedrive
@@ -87,7 +84,7 @@ importers:
         specifier: workspace:*
         version: link:../../packages/typescript-config
       typescript:
-        specifier: latest
+        specifier: ^6.0.2
         version: 6.0.3
       vite:
         specifier: ^5.0.0
@@ -209,6 +206,9 @@ importers:
       '@storage-bridge/typescript-config':
         specifier: workspace:*
         version: link:../typescript-config
+      fast-check:
+        specifier: ^4.8.0
+        version: 4.8.0
       typescript:
         specifier: ^6.0.2
         version: 6.0.3

@@ -2,15 +2,12 @@ import {
   LocalDocumentStoreProvider,
   ProviderRegistry,
   DefaultSettingsStore,
-  ProviderId,
   ConflictError,
 } from '@storage-bridge/core';
+import type { ProviderId } from '@storage-bridge/core';
 
-import {
-  BrowserOAuthClient,
-  handleCallback,
-  OAuthProviderConfig,
-} from '@storage-bridge/auth-web';
+import { BrowserOAuthClient, handleCallback } from '@storage-bridge/auth-web';
+import type { OAuthProviderConfig } from '@storage-bridge/auth-web';
 
 import { GoogleDriveProvider } from '@storage-bridge/provider-google-drive';
 import { DropboxProvider } from '@storage-bridge/provider-dropbox';
@@ -42,17 +39,17 @@ const elBtnClearLogs = document.getElementById('btn-clear-logs') as HTMLButtonEl
 function log(message: string, type: 'info' | 'success' | 'error' = 'info') {
   const entry = document.createElement('div');
   entry.className = `log-entry log-${type}`;
-  
+
   const timeSpan = document.createElement('span');
   timeSpan.className = 'log-time';
   timeSpan.textContent = new Date().toLocaleTimeString();
-  
+
   const textSpan = document.createElement('span');
   textSpan.textContent = message;
-  
+
   entry.appendChild(timeSpan);
   entry.appendChild(textSpan);
-  
+
   elApiLogs.appendChild(entry);
   elApiLogs.scrollTop = elApiLogs.scrollHeight;
 }
@@ -111,10 +108,9 @@ registry.register({
 function updateUIFieldVisibility() {
   const provider = elProviderSelect.value;
   const isLocal = provider === 'local';
-  const isICloud = provider === 'icloud';
 
   const fieldsSection = document.getElementById('credentials-section') as HTMLElement;
-  if (isLocal || isICloud) {
+  if (isLocal) {
     fieldsSection.classList.add('hidden');
   } else {
     fieldsSection.classList.remove('hidden');
@@ -135,16 +131,18 @@ async function refreshDocumentList() {
     log('Fetching document list...');
     const docs = await store.list();
     elDocList.innerHTML = '';
-    docs.forEach(doc => {
+    docs.forEach((doc) => {
       const li = document.createElement('li');
       li.className = 'doc-item';
-      
+
       const infoDiv = document.createElement('div');
-      infoDiv.innerHTML = `
-        <strong>${doc.key}</strong>
-        <div class="doc-meta">Revision: ${doc.revision ?? 'none'}</div>
-      `;
-      
+      const keyLine = document.createElement('strong');
+      keyLine.textContent = doc.key;
+      const metaLine = document.createElement('div');
+      metaLine.className = 'doc-meta';
+      metaLine.textContent = `Revision: ${doc.revision ?? 'none'}`;
+      infoDiv.append(keyLine, metaLine);
+
       const delBtn = document.createElement('button');
       delBtn.className = 'btn btn-danger btn-sm';
       delBtn.textContent = 'Delete';
@@ -395,7 +393,10 @@ async function init() {
   const callback = handleCallback();
   if (callback) {
     if (callback.kind === 'error') {
-      log(`OAuth authentication error: ${callback.error}${callback.error_description ? ` - ${callback.error_description}` : ''}`, 'error');
+      log(
+        `OAuth authentication error: ${callback.error}${callback.error_description ? ` - ${callback.error_description}` : ''}`,
+        'error',
+      );
       window.history.replaceState({}, document.title, window.location.pathname);
       return;
     }
@@ -458,7 +459,7 @@ async function init() {
     try {
       await oauthClient.completeAuthFlow(callback);
       log('OAuth authentication completed successfully!', 'success');
-      
+
       log(`Connecting store to ${providerId}...`);
       await store.connect(providerId);
       log(`Store connected to ${providerId}`, 'success');

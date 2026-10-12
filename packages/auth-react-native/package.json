@@ -42,10 +42,10 @@
   },
   "peerDependenciesMeta": {
     "expo-auth-session": {
-      "optional": false
+      "optional": true
     },
     "expo-secure-store": {
-      "optional": false
+      "optional": true
     }
   },
   "devDependencies": {

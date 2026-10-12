@@ -26,8 +26,6 @@
       "favicon": "./assets/favicon.png"
     },
     "scheme": "storagebridge",
-    "plugins": [
-      "expo-secure-store"
-    ]
+    "plugins": ["expo-secure-store"]
   }
 }

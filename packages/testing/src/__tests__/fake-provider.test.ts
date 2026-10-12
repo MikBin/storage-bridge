@@ -1,4 +1,4 @@
-﻿import { describe, it, expect } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { FakeDocumentStoreProvider } from '../fake-provider.js';
 
 function createProvider(): FakeDocumentStoreProvider {

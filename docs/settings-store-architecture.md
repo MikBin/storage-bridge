@@ -52,6 +52,20 @@ storage-bridge/
 |-- README.md
 |-- docs/
 |   `-- settings-store-architecture.md
+|-- apps/
+|   |-- docs/                       @storage-bridge/docs (TypeDoc API reference)
+|   |   |-- typedoc.json
+|   |   `-- package.json
+|   `-- playground/                 @storage-bridge/playground (Vite web playground)
+|       |-- index.html
+|       |-- vite.config.ts
+|       `-- src/
+|           `-- main.ts
+|-- examples/
+|   `-- react-native/               @storage-bridge/example-react-native (Expo)
+|       |-- app.json
+|       |-- metro.config.cjs
+|       `-- App.tsx
 `-- packages/
     |-- core/                          @storage-bridge/core
     |   `-- src/
@@ -130,11 +144,20 @@ storage-bridge/
 | `@storage-bridge/testing` | Fixtures, `FakeDocumentStoreProvider`, shared provider contract suite | core |
 | `@storage-bridge/eslint-config` | Shared flat ESLint config | (tooling) |
 | `@storage-bridge/typescript-config` | Shared `tsconfig` base | (tooling) |
+| `@storage-bridge/playground` | Browser playground app (Drive/Dropbox/OneDrive/local against the real adapters) | core, auth-web, provider-google-drive, provider-dropbox, provider-onedrive |
+| `@storage-bridge/docs` | TypeDoc API reference generation | (tooling) |
+| `@storage-bridge/example-react-native` | Expo example app (Drive/OneDrive/local via `auth-react-native`) | core, auth-react-native |
 
 Dependency rules (enforced by the workspace graph):
 
 - Everything depends at most on `core`. Providers and auth packages never
   depend on each other; none of them peer-depend on an auth package.
+- Consumer projects (`apps/*`, `examples/*`) may depend on any published
+  package; nothing under `packages/` may depend on `apps/` or `examples/`.
+- The root `package.json` pins the metro family (`pnpm.overrides`, 0.81.5)
+  for the Expo example's Metro bundler; the pins are workspace-global, so
+  bump them together with a future Expo upgrade.
+- Tree reflects v1.1.0 (merge `ff86815`).
 - `auth-web` and `auth-react-native` are publishable, un-private packages
   (decision D4): the OAuth port lives in core, so adapters only need core.
 - `auth-react-native` keeps Expo modules as optional peer dependencies and
@@ -665,3 +688,14 @@ runtime probes.
   - Blocking (8): iCloud provider lacks the specced injected auth seam — CloudKit REST client has no user auth (`ckWebAuthToken`), so the private database is unreachable; CloudKit errors bypass the core error taxonomy (raw `Error`, no `SettingsStoreError`/`AuthRequiredError`); concurrency semantics diverge per provider (iCloud attaches stale `changeTag` on unconditional puts causing spurious conflicts; Drive/Dropbox use race-prone check-then-write; OneDrive uses `If-Match`); Google Drive `findFileByName` swallows all HTTP errors as "not found" (data appears deleted; duplicate files on write); iCloud contract test monkey-patches the class under test (real class fails the lifecycle contract); `iCloud.getProfile()` returns fabricated user identity; `ConflictError` carries encoded file names instead of logical keys; `LocalDocumentStoreProvider.disconnect()` wipes all data, contradicting the local-provider spec (store must persist across disconnect).
   - Suggestions (10): move the `OAuthClient` port into core (removes RN→auth-web and provider→auth-web coupling); ship per-provider `ProviderDescriptor` factories and fix the UA-based `isSupported()` heuristic; strengthen the contract suite (error-payload pinning, disconnected-state semantics, taxonomy conformance, pagination); add pagination (`has_more`/`@odata.nextLink`/`pageToken`/`continuationMarker`) and drop OneDrive's redundant metadata round-trip; document the browser two-phase redirect auth flow; validate pending OAuth state (providerId match + freshness); reconcile `ProviderRegistry` with its spec (duplicate-register validation); test key-encoding edge cases (`/`, `:`, `#`); add CI for the turbo pipelines; refresh this doc to match the shipped monorepo (provider-local, error codes, `ProviderRegistry`/`createSettingsStore`, record-backed `changeTag` semantics, token-storage threat model).
   - Also noted: dead `DocumentNotFoundError`, unpinned toolchain deps, mojibake in the monorepo tree, hardcoded CloudKit record type, write-only `ProviderCapability` union.
+
+## Review (post-merge integration)
+
+- **Verdict:** NEEDS_REVISION
+- **Date:** 2026-10-12
+- **Reviewer:** Kilo (glm-5.3-flash) — architecture review of the merged tree (`ff86815`: playground, docs app, RN example, v1.1.0)
+- **Scope:** layer integrity, new packages' fit, doc-vs-reality drift, workspace topology, versioning, D1–D5 conformance
+- **Summary of findings:**
+  - Blocking (3): `auth-react-native` peer deps contradict the documented optional-peer strategy; monorepo tree/responsibilities sections predate the merged `apps/`+`examples/` projects; merge-introduced mojibake + BOM in two source files.
+  - Suggestions: RN deep-link `completeAuthFlow` has no pending-state producer; stale "fast-check not installed" bypass comments now that fast-check is a root devDep; no changeset/CHANGELOG entry for 1.1.0; unpinned `typescript: latest` in apps; TypeDoc misses the published `testing` package; stale CI typecheck comment.
+  - Confirmed intact: zero-runtime-dep core, single OAuth type home, consumer pattern in playground/example, D1–D5 all hold, 13 projects coherent at 1.1.0.

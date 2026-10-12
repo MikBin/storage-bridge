@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   StyleSheet,
   Text,
@@ -18,13 +18,8 @@ import {
   DefaultSettingsStore,
   ConflictError,
 } from '@storage-bridge/core';
-import type {
-  ProviderId,
-  SettingsSummary,
-} from '@storage-bridge/core';
-import {
-  ReactNativeOAuthClient,
-} from '@storage-bridge/auth-react-native';
+import type { ProviderId, SettingsSummary } from '@storage-bridge/core';
+import { ReactNativeOAuthClient } from '@storage-bridge/auth-react-native';
 import { GoogleDriveProvider } from '@storage-bridge/provider-google-drive';
 import { OneDriveProvider } from '@storage-bridge/provider-onedrive';
 
@@ -102,7 +97,9 @@ export default function App() {
       setIsConnected(connected);
       if (connected) {
         const userProfile = await store.getProfile();
-        setProfile(userProfile ? { accountId: userProfile.accountId, email: userProfile.email } : null);
+        setProfile(
+          userProfile ? { accountId: userProfile.accountId, email: userProfile.email } : null,
+        );
         addLog('Store connected state verified.', 'info');
         await refreshDocuments();
       } else {
@@ -110,14 +107,18 @@ export default function App() {
         setDocuments([]);
       }
     } catch (err) {
-      addLog(`Failed checking connection: ${err instanceof Error ? err.message : String(err)}`, 'error');
+      addLog(
+        `Failed checking connection: ${err instanceof Error ? err.message : String(err)}`,
+        'error',
+      );
     }
   }, [addLog, refreshDocuments]);
 
   // Initial auto-connect local or state check
   useEffect(() => {
     addLog('Storage Bridge Initialized. Auto-connecting local...', 'info');
-    store.connect('local')
+    store
+      .connect('local')
       .then(() => {
         addLog('Connected to Local provider.', 'success');
         checkConnectionStatus();
@@ -137,7 +138,10 @@ export default function App() {
         addLog('Local provider connected successfully.', 'success');
         await checkConnectionStatus();
       } catch (err) {
-        addLog(`Local connect failed: ${err instanceof Error ? err.message : String(err)}`, 'error');
+        addLog(
+          `Local connect failed: ${err instanceof Error ? err.message : String(err)}`,
+          'error',
+        );
       } finally {
         setLoading(false);
       }
@@ -168,7 +172,7 @@ export default function App() {
         scopes = ['Files.ReadWrite.AppFolder', 'User.Read', 'offline_access'];
       }
 
-      // Configure OAuth client â€” create() resolves expo-secure-store
+      // Configure OAuth client — create() resolves expo-secure-store
       // dynamically; direct construction without a token store throws.
       const oauthClient = await ReactNativeOAuthClient.create({
         config: {
@@ -236,7 +240,10 @@ export default function App() {
         setDocKey(envelope.key);
         setDocRevision(envelope.revision ?? '');
         setDocData(JSON.stringify(envelope.data, null, 2));
-        addLog(`Fetched "${key}" successfully (revision: ${envelope.revision ?? 'none'}).`, 'success');
+        addLog(
+          `Fetched "${key}" successfully (revision: ${envelope.revision ?? 'none'}).`,
+          'success',
+        );
       } else {
         addLog(`Key "${key}" not found.`, 'info');
         Alert.alert('Not Found', `No document exists for key "${key}"`);
@@ -300,7 +307,12 @@ export default function App() {
       <StatusBar barStyle="light-content" />
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Storage Bridge Mobile</Text>
-        <View style={[styles.statusBadge, isConnected ? styles.badgeConnected : styles.badgeDisconnected]}>
+        <View
+          style={[
+            styles.statusBadge,
+            isConnected ? styles.badgeConnected : styles.badgeDisconnected,
+          ]}
+        >
           <Text style={styles.statusText}>{isConnected ? 'Connected' : 'Disconnected'}</Text>
         </View>
       </View>
@@ -309,7 +321,7 @@ export default function App() {
         {/* Connection Setup Card */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>1. Connection Settings</Text>
-          
+
           <Text style={styles.label}>Select Provider</Text>
           <View style={styles.pickerContainer}>
             {(['local', 'google-drive', 'onedrive'] as const).map((id) => (
@@ -319,7 +331,12 @@ export default function App() {
                 disabled={isConnected}
                 onPress={() => setProviderId(id)}
               >
-                <Text style={[styles.pickerButtonText, providerId === id && styles.pickerButtonTextActive]}>
+                <Text
+                  style={[
+                    styles.pickerButtonText,
+                    providerId === id && styles.pickerButtonTextActive,
+                  ]}
+                >
                   {id === 'local' ? 'Local' : id === 'google-drive' ? 'Google' : 'OneDrive'}
                 </Text>
               </TouchableOpacity>
@@ -413,13 +430,22 @@ export default function App() {
             />
 
             <View style={styles.row}>
-              <TouchableOpacity style={[styles.btnSecondary, styles.flex1]} onPress={() => handleGet()}>
+              <TouchableOpacity
+                style={[styles.btnSecondary, styles.flex1]}
+                onPress={() => handleGet()}
+              >
                 <Text style={styles.btnSecondaryText}>Fetch</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[styles.btnPrimary, styles.flex1, { marginHorizontal: 8 }]} onPress={handlePut}>
+              <TouchableOpacity
+                style={[styles.btnPrimary, styles.flex1, { marginHorizontal: 8 }]}
+                onPress={handlePut}
+              >
                 <Text style={styles.btnText}>Save</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[styles.btnDanger, styles.flex1]} onPress={() => handleDelete()}>
+              <TouchableOpacity
+                style={[styles.btnDanger, styles.flex1]}
+                onPress={() => handleDelete()}
+              >
                 <Text style={styles.btnText}>Delete</Text>
               </TouchableOpacity>
             </View>
@@ -433,7 +459,7 @@ export default function App() {
             <TouchableOpacity style={styles.btnSecondary} onPress={refreshDocuments}>
               <Text style={styles.btnSecondaryText}>Refresh File List</Text>
             </TouchableOpacity>
-            
+
             {documents.length === 0 ? (
               <Text style={styles.emptyText}>No documents stored yet.</Text>
             ) : (
@@ -444,10 +470,16 @@ export default function App() {
                     <Text style={styles.docRevisionText}>Rev: {doc.revision ?? 'none'}</Text>
                   </View>
                   <View style={styles.row}>
-                    <TouchableOpacity style={styles.actionIconBtn} onPress={() => handleGet(doc.key)}>
+                    <TouchableOpacity
+                      style={styles.actionIconBtn}
+                      onPress={() => handleGet(doc.key)}
+                    >
                       <Text style={styles.actionIconText}>Fetch</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={[styles.actionIconBtn, { marginLeft: 8 }]} onPress={() => handleDelete(doc.key)}>
+                    <TouchableOpacity
+                      style={[styles.actionIconBtn, { marginLeft: 8 }]}
+                      onPress={() => handleDelete(doc.key)}
+                    >
                       <Text style={styles.actionIconTextRed}>Delete</Text>
                     </TouchableOpacity>
                   </View>
