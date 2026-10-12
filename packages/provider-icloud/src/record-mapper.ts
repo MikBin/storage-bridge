@@ -1,50 +1,68 @@
-import type { CloudRecord } from '@storage-bridge/core';
+import { SettingsStoreError, type CloudRecord } from '@storage-bridge/core';
+import { DEFAULT_RECORD_TYPE, type CloudKitField, type CloudKitRecordRaw } from './cloudkit-client.js';
 
-export interface CloudKitField {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  value: any;
+/**
+ * CloudKit fields are typed — arbitrary JSON objects are not valid field
+ * values. The document envelope therefore serializes as JSON into the single
+ * STRING record field `payload` (D3 criterion 4) and parses back losslessly.
+ */
+const PAYLOAD_FIELD = 'payload';
+
+function scalarField(value: unknown): CloudKitField {
+  return { value };
 }
 
-export interface CloudKitRecord {
-  recordName: string;
-  recordType: string;
-  recordChangeTag?: string;
-  modified?: {
-    timestamp: number;
-  };
-  fields: Record<string, CloudKitField>;
-}
+/** Map a raw CloudKit record to our CloudRecord, rehydrating the JSON payload. */
+export function mapToCloudRecord(raw: CloudKitRecordRaw): CloudRecord {
+  const payloadField = raw.fields?.[PAYLOAD_FIELD];
+  if (payloadField === undefined || payloadField === null || typeof payloadField.value !== 'string') {
+    throw new SettingsStoreError(
+      `CloudKit record ${raw.recordName} is missing its serialized payload string field`,
+      'ICLOUD_RECORD_ERROR',
+    );
+  }
 
-export function mapToCloudRecord(ckRecord: CloudKitRecord): CloudRecord {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const fields: Record<string, any> = {};
-  for (const [key, field] of Object.entries(ckRecord.fields)) {
-    fields[key] = field.value;
+  let data: unknown;
+  try {
+    data = JSON.parse(payloadField.value);
+  } catch (error) {
+    throw new SettingsStoreError(
+      `CloudKit record ${raw.recordName} carries a corrupt payload`,
+      'ICLOUD_RECORD_ERROR',
+      error,
+    );
   }
 
   return {
-    recordName: ckRecord.recordName,
-    changeTag: ckRecord.recordChangeTag,
-    modifiedAt: ckRecord.modified ? new Date(ckRecord.modified.timestamp).toISOString() : undefined,
-    fields
+    recordName: raw.recordName,
+    changeTag: raw.recordChangeTag,
+    modifiedAt: raw.modified ? new Date(raw.modified.timestamp).toISOString() : undefined,
+    fields: {
+      key: raw.fields.key?.value,
+      schemaVersion: raw.fields.schemaVersion?.value,
+      updatedAt: raw.fields.updatedAt?.value,
+      data,
+    },
   };
 }
 
-export function mapFromCloudRecord(record: CloudRecord): CloudKitRecord {
-  const fields: Record<string, CloudKitField> = {};
-  for (const [key, value] of Object.entries(record.fields)) {
-    fields[key] = { value };
-  }
-
-  const ckRecord: CloudKitRecord = {
+/** Build CloudKit record fields from a CloudRecord for saving, serializing the
+ * document payload into the single string field. */
+export function mapFromCloudRecord(record: CloudRecord, recordType: string = DEFAULT_RECORD_TYPE): CloudKitRecordRaw {
+  const raw: CloudKitRecordRaw = {
     recordName: record.recordName,
-    recordType: 'SettingsDocument',
-    fields
+    recordType,
+    fields: {
+      key: scalarField(record.fields.key),
+      schemaVersion: scalarField(record.fields.schemaVersion),
+      updatedAt: scalarField(record.fields.updatedAt),
+      payload: scalarField(JSON.stringify(record.fields.data)),
+    },
   };
 
   if (record.changeTag) {
-    ckRecord.recordChangeTag = record.changeTag;
+    raw.recordChangeTag = record.changeTag;
   }
 
-  return ckRecord;
+  return raw;
 }

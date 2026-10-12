@@ -1,26 +1,24 @@
 import { describeProviderContract, type ContractFamily } from '@storage-bridge/testing';
 import { ICloudProvider } from '../icloud-provider.js';
-import { createCloudKitApiMock } from './icloud-api-mock.js';
+import { createCloudKitClientMock } from './icloud-api-mock.js';
 
-const apiMock = createCloudKitApiMock();
+const clientMock = createCloudKitClientMock();
 
 function createHarness(listPageSize?: number): ICloudProvider {
-  apiMock.reset();
-  apiMock.setListPageSize(listPageSize ?? null);
+  clientMock.reset();
+  clientMock.setListPageSize(listPageSize ?? null);
 
   return new ICloudProvider({
-    apiToken: 'test-token',
-    containerId: 'iCloud.com.test.container',
-    environment: 'development',
-    fetchFn: apiMock.fetchFn,
+    client: clientMock,
+    config: { containerIdentifier: 'iCloud.com.test.container', environment: 'development' },
   });
 }
 
 /**
- * Honest harness: the unmodified ICloudProvider runs the shared suite against
- * the CloudKit API mock. Lifecycle methods are no longer monkey-patched. All
- * pending families and scenarios have been activated by their owning
- * remediation steps — the suite runs fully green with zero expected-fail.
+ * Honest harness: the unmodified ICloudProvider consumes the injected
+ * CloudKitClient port (D3) against a port-level fake. All pending families
+ * and scenarios have been activated by their owning remediation steps — the
+ * suite runs fully green with zero expected-fail.
  */
 const PENDING_FAMILIES: readonly ContractFamily[] = [];
 
@@ -31,11 +29,11 @@ describeProviderContract('ICloudProvider', () => createHarness(), {
   pendingScenarios: PENDING_SCENARIOS,
   withListPageSize: pageSize => () => createHarness(pageSize),
   runWithServerError: async operation => {
-    apiMock.setGlobalFailure(500);
+    clientMock.setGlobalFailure(500);
     try {
       await operation();
     } finally {
-      apiMock.setGlobalFailure(null);
+      clientMock.setGlobalFailure(null);
     }
   },
 });
