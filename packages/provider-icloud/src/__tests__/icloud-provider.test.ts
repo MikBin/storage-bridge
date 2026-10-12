@@ -49,14 +49,14 @@ describe('ICloudProvider', () => {
       expect(await provider.isConnected()).toBe(false);
     });
 
-    it('getProfile returns mock data', async () => {
-      const profile = await provider.getProfile();
-      expect(profile).toEqual({
-        provider: 'icloud',
-        accountId: 'icloud-user',
-        displayName: 'iCloud User',
-        email: 'user@icloud.com'
-      });
+    it('getProfile returns null when disconnected and only the provider identity when connected', async () => {
+      expect(await provider.getProfile()).toBeNull();
+
+      await provider.connect();
+      expect(await provider.getProfile()).toEqual({ provider: 'icloud' });
+
+      await provider.disconnect();
+      expect(await provider.getProfile()).toBeNull();
     });
   });
 

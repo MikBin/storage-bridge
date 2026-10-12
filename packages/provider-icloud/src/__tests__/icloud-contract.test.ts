@@ -18,28 +18,13 @@ function createHarness(listPageSize?: number): ICloudProvider {
 
 /**
  * Honest harness: the unmodified ICloudProvider runs the shared suite against
- * the CloudKit API mock. Lifecycle methods are no longer monkey-patched — the
- * provider's fabricated connection state is declared honestly as pending
- * families instead. Activating a family (removing it from this list) is the
- * acceptance gate of the remediation step that owns it.
- */
-/**
- * Family participation: 'error-taxonomy' and 'disconnected-operations' were
- * activated by 02-06 (minimal connected flag, uniform pre-connect
- * NotConnectedError guard via the RecordBacked base, coded CloudKit errors).
- *
- * The 02-06 flag also satisfies the isConnected clauses of 'honest-lifecycle'
- * ('starts disconnected', 'disconnect() transitions back') as a side effect —
- * a passing it.fails scaffold fails the suite, so those two run active at
- * scenario granularity. The remaining honest-lifecycle lie (getProfile()
- * fabricating a profile while disconnected) stays pending for 02-08.
- * Activating it is 02-08's acceptance gate.
+ * the CloudKit API mock. Lifecycle methods are no longer monkey-patched. All
+ * pending families and scenarios have been activated by their owning
+ * remediation steps — the suite runs fully green with zero expected-fail.
  */
 const PENDING_FAMILIES: readonly ContractFamily[] = [];
 
-const PENDING_SCENARIOS: readonly string[] = [
-  'honest-lifecycle:profile-null-when-disconnected', // 02-08
-];
+const PENDING_SCENARIOS: readonly string[] = [];
 
 describeProviderContract('ICloudProvider', () => createHarness(), {
   pendingFamilies: PENDING_FAMILIES,

@@ -46,12 +46,14 @@ export class ICloudProvider extends RecordBackedDocumentProvider {
   }
 
   async getProfile(): Promise<ConnectedProfile | null> {
-    return {
-      provider: 'icloud',
-      accountId: 'icloud-user',
-      displayName: 'iCloud User',
-      email: 'user@icloud.com'
-    };
+    // Port contract (matches the shared suite's honest-lifecycle family):
+    // null while disconnected; when connected, only the provider identity —
+    // CloudKit exposes no account/email/display name without a user-facing
+    // discoverIdentity call, so nothing is fabricated here.
+    if (!this.connected) {
+      return null;
+    }
+    return { provider: 'icloud' };
   }
 
   public async getRecord(key: string): Promise<CloudRecord | null> {
