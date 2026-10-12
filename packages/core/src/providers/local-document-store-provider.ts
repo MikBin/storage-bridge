@@ -20,9 +20,9 @@ export class LocalDocumentStoreProvider implements DocumentStoreProvider {
   }
 
   async disconnect(): Promise<void> {
+    // Local-provider spec: disconnect clears only the connection flag — the
+    // store persists across disconnect/reconnect within the same instance.
     this.connected = false;
-    this.store.clear();
-    this.revisionCounters.clear();
   }
 
   async isConnected(): Promise<boolean> {
@@ -55,11 +55,13 @@ export class LocalDocumentStoreProvider implements DocumentStoreProvider {
     this.ensureConnected();
 
     const existing = this.store.get(doc.key);
-    if (options?.expectedRevision !== undefined) {
-      const currentRevision = existing?.revision;
-      if (currentRevision !== options.expectedRevision) {
-        throw new ConflictError(doc.key);
-      }
+
+    // D2 semantics (02-02), mirrored from the shared contract fake: an
+    // expectation rejects on mismatch or missing key (uniform rule); force
+    // skips the check entirely.
+    const expectedRevision = options?.force ? undefined : options?.expectedRevision;
+    if (expectedRevision !== undefined && existing?.revision !== expectedRevision) {
+      throw new ConflictError(doc.key);
     }
 
     const currentCounter = this.revisionCounters.get(doc.key) ?? 0;
