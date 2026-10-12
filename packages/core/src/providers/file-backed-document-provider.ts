@@ -25,6 +25,13 @@ export abstract class FileBackedDocumentProvider implements DocumentStoreProvide
   abstract getProfile(): Promise<ConnectedProfile | null>;
 
   protected abstract readFile(fileName: string): Promise<{ text: string; meta: FileEntry } | null>;
+  /**
+   * D2 conditional-write contract: implementations MUST treat
+   * options.expectedRevision as a write precondition (ConflictError when the
+   * stored revision differs or the key is missing) and options.force as the
+   * opt-out into a blind last-writer-wins overwrite. A write without any
+   * expectation is LWW.
+   */
   protected abstract writeFile(fileName: string, body: string, options?: PutOptions): Promise<FileEntry>;
   protected abstract removeFile(fileName: string): Promise<void>;
   protected abstract listFiles(): Promise<FileEntry[]>;

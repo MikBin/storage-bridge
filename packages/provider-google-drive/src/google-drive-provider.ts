@@ -75,7 +75,12 @@ export class GoogleDriveProvider extends FileBackedDocumentProvider {
   public async writeFile(fileName: string, body: string, options?: PutOptions): Promise<FileEntry> {
     const existing = await this.findFileByName(fileName);
 
-    if (options?.expectedRevision !== undefined) {
+    // Best-effort concurrency (D2): Drive v3 media PATCH has no server-side
+    // content precondition, so this revision check is client-side only. A
+    // concurrent writer landing between this read and the PATCH is NOT
+    // detected (TOCTOU window remains) — the README documents this caveat
+    // (documentation owned by step 04-02). `force` skips the check entirely.
+    if (!options?.force && options?.expectedRevision !== undefined) {
       if (!existing || existing.revision !== options.expectedRevision) {
         throw new ConflictError(fileName);
       }

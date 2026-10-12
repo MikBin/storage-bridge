@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { DefaultSettingsStore } from '../manager.js';
 import {
+  ConflictError,
   NotConnectedError,
   UnsupportedProviderError,
   ProviderUnavailableError,
@@ -64,6 +65,90 @@ class FakeProvider implements DocumentStoreProvider {
       updatedAt: doc.updatedAt,
       revision: doc.revision,
     }));
+  }
+}
+
+/**
+ * Concurrency-enforcing double: rejects when the stored revision does not
+ * match options.expectedRevision — including the uniform missing-key rule
+ * (an expectation against a never-written key rejects).
+ */
+class ConcurrencyEnforcingProvider implements DocumentStoreProvider {
+  public readonly id: ProviderId = 'local';
+  public readonly documents = new Map<string, SettingsEnvelope<unknown>>();
+  private readonly revCounters = new Map<string, number>();
+  private connected = false;
+
+  /**
+   * Deterministic interleaving gate: when set, getDocument() suspends until
+   * the promise resolves, letting a remote writer land between the manager's
+   * internal read and its provider write.
+   */
+  public readGate: Promise<void> | null = null;
+
+  async connect(): Promise<void> {
+    this.connected = true;
+  }
+
+  async disconnect(): Promise<void> {
+    this.connected = false;
+  }
+
+  async isConnected(): Promise<boolean> {
+    return this.connected;
+  }
+
+  async getProfile(): Promise<ConnectedProfile | null> {
+    return this.connected ? { provider: this.id } : null;
+  }
+
+  async getDocument<T>(key: string): Promise<SettingsEnvelope<T> | null> {
+    // Capture BEFORE parking: models a stale in-flight read — the payload is
+    // fixed when the read starts, and the remote write lands while it is
+    // parked on the gate.
+    const entry = this.documents.get(key) ?? null;
+    if (this.readGate) {
+      await this.readGate;
+    }
+    return (entry as SettingsEnvelope<T>) ?? null;
+  }
+
+  async putDocument<T>(
+    doc: SettingsEnvelope<T>,
+    options?: PutOptions
+  ): Promise<SettingsEnvelope<T>> {
+    const expectedRevision = options?.force ? undefined : options?.expectedRevision;
+
+    if (expectedRevision !== undefined) {
+      const currentRevision = this.documents.get(doc.key)?.revision;
+      if (currentRevision !== expectedRevision) {
+        throw new ConflictError(doc.key);
+      }
+    }
+
+    const counter = (this.revCounters.get(doc.key) ?? 0) + 1;
+    this.revCounters.set(doc.key, counter);
+
+    const stored: SettingsEnvelope<T> = { ...doc, revision: `rev-${counter}` };
+    this.documents.set(doc.key, stored);
+    return stored;
+  }
+
+  async deleteDocument(key: string): Promise<void> {
+    this.documents.delete(key);
+  }
+
+  async listDocuments(): Promise<SettingsSummary[]> {
+    return Array.from(this.documents.values()).map(doc => ({
+      key: doc.key,
+      updatedAt: doc.updatedAt,
+      revision: doc.revision,
+    }));
+  }
+
+  /** Direct-provider write used to simulate an interleaved remote writer. */
+  public async simulateRemoteWrite<T>(key: string, data: T): Promise<SettingsEnvelope<T>> {
+    return this.putDocument({ key, schemaVersion: 1, updatedAt: new Date().toISOString(), data });
   }
 }
 
@@ -265,6 +350,145 @@ describe('DefaultSettingsStore', () => {
           ])
         );
       });
+    });
+  });
+});
+
+describe('DefaultSettingsStore — optimistic-by-default concurrency (D2)', () => {
+  let store: DefaultSettingsStore;
+  let provider: ConcurrencyEnforcingProvider;
+
+  beforeEach(async () => {
+    provider = new ConcurrencyEnforcingProvider();
+
+    const registry = new Map<ProviderId, ProviderDescriptor>();
+    registry.set('local', {
+      id: 'local',
+      label: 'Local',
+      capabilities: [],
+      isSupported: async () => true,
+      create: () => provider,
+    });
+
+    store = new DefaultSettingsStore(registry);
+    await store.connect('local');
+  });
+
+  function snapshotRevisions(): Map<string, string | undefined> {
+    const snapshot = new Map<string, string | undefined>();
+    for (const [key, doc] of provider.documents) {
+      snapshot.set(key, doc.revision);
+    }
+    return snapshot;
+  }
+
+  // bypass: fast-check not installed; deterministic interleaving case matrix
+  // (stale-read write, force overwrite, missing-key conditional, interleaved puts)
+  // with state-delta assertions over the document store universe. The read
+  // gate parks the manager's internal read so a remote writer deterministically
+  // lands between the read and the write.
+  describe('interleaved writer case matrix', () => {
+    function armReadGate(): () => void {
+      let release!: () => void;
+      provider.readGate = new Promise<void>(resolve => { release = resolve; });
+      return () => {
+        provider.readGate = null;
+        release();
+      };
+    }
+
+    it('default write after a read rejects with ConflictError when the remote revision advanced', async () => {
+      await store.put('doc', { v: 1 });
+      const releaseRead = armReadGate();
+
+      const inFlight = store.put('doc', { v: 2 }); // manager read parks on the gate
+      await provider.simulateRemoteWrite('doc', { v: 'remote' }); // interleaved writer advances
+      releaseRead();
+
+      await expect(inFlight).rejects.toThrow(ConflictError);
+
+      // state delta: the remote writer's update was not lost to a silent overwrite
+      const survivor = await store.get<{ v: string | number }>('doc');
+      expect(survivor!.data).toEqual({ v: 'remote' });
+    });
+
+    it('interleaved writes never lose updates: the losing writer re-reads and re-applies', async () => {
+      await store.put('doc', { v: 1 });
+      const releaseRead = armReadGate();
+
+      const inFlight = store.put('doc', { v: 2 });
+      await provider.simulateRemoteWrite('doc', { v: 'remote' });
+      releaseRead();
+
+      await expect(inFlight).rejects.toThrow(ConflictError);
+
+      // loser reconciles: fresh read observes the advanced revision, then writes on top of it
+      const current = await store.get<{ v: string | number }>('doc');
+      const reconciled = await store.put(
+        'doc',
+        { v: `${current!.data.v}+local` },
+        { expectedRevision: current!.revision },
+      );
+
+      expect(reconciled.data).toEqual({ v: 'remote+local' });
+      const finalDoc = provider.documents.get('doc');
+      expect(finalDoc!.revision).toBe(reconciled.revision);
+    });
+
+    it('explicit force opt-out overwrites despite a concurrent remote change', async () => {
+      await store.put('doc', { v: 1 });
+      const releaseRead = armReadGate();
+
+      const inFlight = store.put('doc', { v: 2 }, { force: true });
+      await provider.simulateRemoteWrite('doc', { v: 'remote' });
+      releaseRead();
+
+      const forced = await inFlight;
+
+      expect(forced.data).toEqual({ v: 2 });
+      const survivor = await store.get<{ v: number }>('doc');
+      expect(survivor!.data).toEqual({ v: 2 });
+    });
+
+    it('first write to a key with no existing document succeeds without an expectation', async () => {
+      const before = snapshotRevisions();
+      const created = await store.put('fresh', { v: 1 });
+
+      expect(created.revision).toBeDefined();
+      expect(before.has('fresh')).toBe(false);
+    });
+
+    it('explicit expectedRevision against a non-existent key rejects with ConflictError (uniform rule)', async () => {
+      await expect(
+        store.put('never-written', { v: 1 }, { expectedRevision: 'revision-of-a-ghost' }),
+      ).rejects.toThrow(ConflictError);
+      expect(provider.documents.has('never-written')).toBe(false);
+    });
+
+    it('default write after a read succeeds when the remote revision did not advance', async () => {
+      await store.put('doc', { v: 1 });
+
+      const updated = await store.put('doc', { v: 2 });
+
+      expect(updated.data).toEqual({ v: 2 });
+      const stored = await store.get<{ v: number }>('doc');
+      expect(stored!.data).toEqual({ v: 2 });
+    });
+
+    it('adjacent keys are untouched by a conflicting write (state-delta universe)', async () => {
+      await store.put('bystander', { keep: true });
+      await store.put('doc', { v: 1 });
+      const before = snapshotRevisions();
+
+      const releaseRead = armReadGate();
+      const inFlight = store.put('doc', { v: 2 });
+      await provider.simulateRemoteWrite('doc', { v: 'remote' });
+      releaseRead();
+      await expect(inFlight).rejects.toThrow(ConflictError);
+
+      const after = snapshotRevisions();
+      expect(after.get('bystander')).toBe(before.get('bystander'));
+      expect(after.get('doc')).not.toBe(before.get('doc'));
     });
   });
 });

@@ -1,6 +1,7 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import type { CloudRecord } from '../providers/record-backed-document-provider.js';
 import { RecordBackedDocumentProvider } from '../providers/record-backed-document-provider.js';
+import { ConflictError } from '../errors.js';
 import type { ProviderId, PutOptions, ConnectedProfile } from '../types.js';
 
 class InMemoryRecordProvider extends RecordBackedDocumentProvider {
@@ -123,6 +124,75 @@ describe('RecordBackedDocumentProvider', () => {
       for (const s of list) {
         expect(s.updatedAt).toBeDefined();
       }
+    });
+  });
+
+  describe('changeTag provenance (D2: explicit expectations only)', () => {
+    it('plain putDocument never derives changeTag from the document revision', async () => {
+      const p = createProvider();
+      const saveSpy = vi.spyOn(p as unknown as { saveRecord: (r: CloudRecord, o?: PutOptions) => Promise<CloudRecord> }, 'saveRecord');
+
+      await p.putDocument<{ v: number }>({
+        key: 'implicit-tag',
+        schemaVersion: 1,
+        updatedAt: '',
+        revision: 'stale-tag-from-document',
+        data: { v: 1 },
+      });
+
+      expect(saveSpy).toHaveBeenCalledTimes(1);
+      expect(saveSpy.mock.calls[0][0].changeTag).toBeUndefined();
+    });
+
+    it('explicit expectedRevision is forwarded as changeTag', async () => {
+      const p = createProvider();
+      const seeded = await p.putDocument<{ v: number }>(
+        { key: 'explicit-tag', schemaVersion: 1, updatedAt: '', data: { v: 1 } },
+      );
+      const saveSpy = vi.spyOn(p as unknown as { saveRecord: (r: CloudRecord, o?: PutOptions) => Promise<CloudRecord> }, 'saveRecord');
+
+      await p.putDocument<{ v: number }>(
+        { key: 'explicit-tag', schemaVersion: 1, updatedAt: '', revision: 'ignored-document-tag', data: { v: 2 } },
+        { expectedRevision: seeded.revision },
+      );
+
+      expect(saveSpy).toHaveBeenCalledTimes(1);
+      expect(saveSpy.mock.calls[0][0].changeTag).toBe(seeded.revision);
+    });
+
+    it('force suppresses the changeTag even with an explicit expectation', async () => {
+      const p = createProvider();
+      const saveSpy = vi.spyOn(p as unknown as { saveRecord: (r: CloudRecord, o?: PutOptions) => Promise<CloudRecord> }, 'saveRecord');
+
+      await p.putDocument<{ v: number }>(
+        { key: 'force-tag', schemaVersion: 1, updatedAt: '', data: { v: 1 } },
+        { expectedRevision: 'stale-expectation', force: true },
+      );
+
+      expect(saveSpy).toHaveBeenCalledTimes(1);
+      expect(saveSpy.mock.calls[0][0].changeTag).toBeUndefined();
+    });
+
+    it('expectedRevision against a non-existent key rejects with ConflictError (uniform rule)', async () => {
+      const p = createProvider();
+      await expect(
+        p.putDocument<{ v: number }>(
+          { key: 'missing-record', schemaVersion: 1, updatedAt: '', data: { v: 1 } },
+          { expectedRevision: 'revision-of-a-never-written-key' },
+        ),
+      ).rejects.toThrow(ConflictError);
+    });
+
+    it('expectedRevision matching an advanced changeTag rejects with ConflictError', async () => {
+      const p = createProvider();
+      await p.putDocument<{ v: number }>({ key: 'stale-target', schemaVersion: 1, updatedAt: '', data: { v: 1 } });
+
+      await expect(
+        p.putDocument<{ v: number }>(
+          { key: 'stale-target', schemaVersion: 1, updatedAt: '', data: { v: 2 } },
+          { expectedRevision: 'not-the-current-tag' },
+        ),
+      ).rejects.toThrow(ConflictError);
     });
   });
 });

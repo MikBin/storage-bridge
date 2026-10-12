@@ -71,6 +71,15 @@ export class DefaultSettingsStore implements SettingsStore {
 
     const existing = await this.current!.getDocument<T>(key);
 
+    // Optimistic by default (Decision D2): the revision read immediately
+    // above becomes the expected revision, so a write whose remote state
+    // advanced in the meantime rejects with ConflictError instead of losing
+    // updates. `force` opts out into a blind last-writer-wins overwrite; an
+    // explicit caller expectation always takes precedence.
+    const expectedRevision = options?.force
+      ? undefined
+      : options?.expectedRevision ?? existing?.revision;
+
     const doc: SettingsEnvelope<T> = {
       key,
       schemaVersion: existing?.schemaVersion ?? 1,
@@ -79,7 +88,7 @@ export class DefaultSettingsStore implements SettingsStore {
       data,
     };
 
-    return this.current!.putDocument(doc, options);
+    return this.current!.putDocument(doc, { ...options, expectedRevision });
   }
 
   public async delete(key: string): Promise<void> {

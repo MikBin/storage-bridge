@@ -66,24 +66,19 @@ export class DropboxProvider extends FileBackedDocumentProvider {
   }
 
   public async writeFile(fileName: string, body: string, options?: PutOptions): Promise<FileEntry> {
-    const existing = await this.findFileByName(fileName);
-
-    if (options?.expectedRevision !== undefined) {
-      if (!existing || existing.revision !== options.expectedRevision) {
-        throw new ConflictError(fileName);
-      }
-    }
+    const mode = resolveUploadMode(options);
 
     const res = await this.fetchFn(`${CONTENT_BASE}/2/files/upload`, {
       method: 'POST',
       headers: {
         ...(await this.auth.getAuthHeaders()),
         'Content-Type': 'application/octet-stream',
-        'Dropbox-API-Arg': JSON.stringify({ path: `/${fileName}`, mode: 'overwrite', mute: true }),
+        'Dropbox-API-Arg': JSON.stringify({ path: `/${fileName}`, mode, mute: true }),
       },
       body,
     });
 
+    if (res.status === 409) throw new ConflictError(fileName);
     if (res.status === 401 || res.status === 403) throw new AuthRequiredError(this.id);
     if (!res.ok) throw new SettingsStoreError(`Dropbox write failed: ${res.status}`, 'DROPBOX_WRITE_ERROR');
 
@@ -123,9 +118,18 @@ export class DropboxProvider extends FileBackedDocumentProvider {
       .filter(e => e['.tag'] === 'file')
       .map(e => toFileEntry(e, (n) => this.fileNameToKey(n)));
   }
+}
 
-  private async findFileByName(name: string): Promise<FileEntry | null> {
-    const files = await this.listFiles();
-    return files.find(f => f.name === name) ?? null;
+/**
+ * D2 conditional writes: Dropbox's update mode is the server-side revision
+ * precondition — the upload succeeds only while the stored revision still
+ * equals the revision read before the write, so interleaved writers are
+ * detected atomically (409 → ConflictError). `force` opts out into a blind
+ * overwrite (last-writer-wins); a write without any expectation is LWW too.
+ */
+function resolveUploadMode(options?: PutOptions): string | { '.tag': 'update'; update: string } {
+  if (!options?.force && options?.expectedRevision !== undefined) {
+    return { '.tag': 'update', update: options.expectedRevision };
   }
+  return 'overwrite';
 }

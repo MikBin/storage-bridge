@@ -172,6 +172,80 @@ describe('DropboxProvider', () => {
         provider.writeFile('new.json', '{}', { expectedRevision: 'any-revision' }),
       ).rejects.toThrow(ConflictError);
     });
+
+    it('writeFile sends conditional update mode keyed to the read revision', async () => {
+      const { provider, api } = createProvider();
+      const v1 = await provider.writeFile('cond.json', '{"v":1}');
+
+      const seen: Array<Record<string, string>> = [];
+      const conditionalFetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+        const headers = (init?.headers ?? {}) as Record<string, string>;
+        if (headers['Dropbox-API-Arg']?.includes('/cond.json')) {
+          seen.push(headers);
+        }
+        return api.mockFetch(input as string | URL | Request, init);
+      }) as typeof fetch;
+      const observed = new DropboxProvider({
+        auth: createFakeOAuthClient(),
+        fetchFn: conditionalFetch,
+      });
+
+      await observed.writeFile('cond.json', '{"v":2}', { expectedRevision: v1.revision });
+
+      expect(seen).toHaveLength(1);
+      const arg = JSON.parse(seen[0]['Dropbox-API-Arg']);
+      expect(arg.mode).toEqual({ '.tag': 'update', update: v1.revision });
+    });
+
+    it('writeFile uses overwrite mode under force', async () => {
+      const { provider, api } = createProvider();
+      await provider.writeFile('forced.json', '{"v":1}');
+
+      const seen: Array<Record<string, string>> = [];
+      const conditionalFetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+        const headers = (init?.headers ?? {}) as Record<string, string>;
+        if (headers['Dropbox-API-Arg']?.includes('/forced.json')) {
+          seen.push(headers);
+        }
+        return api.mockFetch(input as string | URL | Request, init);
+      }) as typeof fetch;
+      const observed = new DropboxProvider({
+        auth: createFakeOAuthClient(),
+        fetchFn: conditionalFetch,
+      });
+
+      const forced = await observed.writeFile('forced.json', '{"v":2}', {
+        expectedRevision: 'stale-revision',
+        force: true,
+      });
+
+      expect(forced.revision).toBeDefined();
+      const arg = JSON.parse(seen[0]['Dropbox-API-Arg']);
+      expect(arg.mode).toBe('overwrite');
+    });
+
+    it('writeFile uses overwrite mode when no expectation is given', async () => {
+      const { provider, api } = createProvider();
+      await provider.writeFile('free.json', '{"v":1}');
+
+      const seen: Array<Record<string, string>> = [];
+      const conditionalFetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+        const headers = (init?.headers ?? {}) as Record<string, string>;
+        if (headers['Dropbox-API-Arg']?.includes('/free.json')) {
+          seen.push(headers);
+        }
+        return api.mockFetch(input as string | URL | Request, init);
+      }) as typeof fetch;
+      const observed = new DropboxProvider({
+        auth: createFakeOAuthClient(),
+        fetchFn: conditionalFetch,
+      });
+
+      await observed.writeFile('free.json', '{"v":2}');
+
+      const arg = JSON.parse(seen[0]['Dropbox-API-Arg']);
+      expect(arg.mode).toBe('overwrite');
+    });
   });
 
   describe('error handling', () => {

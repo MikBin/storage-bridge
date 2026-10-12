@@ -29,7 +29,17 @@ export interface ConnectedProfile {
 }
 
 export interface PutOptions {
+  /**
+   * Expected current revision for an optimistic write. When it does not
+   * match the stored revision — or when the key does not exist — the write
+   * rejects with ConflictError.
+   */
   expectedRevision?: Revision;
+  /**
+   * Force the write through as last-writer-wins: skips the revision
+   * precondition even when expectedRevision is provided.
+   */
+  force?: boolean;
 }
 
 export interface SettingsStore {

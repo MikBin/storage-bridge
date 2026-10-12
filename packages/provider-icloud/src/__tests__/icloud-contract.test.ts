@@ -13,7 +13,6 @@ const apiMock = createCloudKitApiMock();
  */
 const PENDING_FAMILIES: readonly ContractFamily[] = [
   'honest-lifecycle',        // 02-08: provider fabricates connect/isConnected/getProfile state
-  'conflict-missing-key',    // 02-02: expectedRevision against a missing record is silently created
   'error-taxonomy',          // 02-06: disconnected reads resolve instead of rejecting
   'disconnected-operations', // 02-04: operations succeed before connect()
   'conflict-payload',        // 02-05: ConflictError carries no logical-key payload

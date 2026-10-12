@@ -1,3 +1,4 @@
+import { ConflictError } from '../errors.js';
 import type {
   DocumentStoreProvider,
   ProviderId,
@@ -40,10 +41,24 @@ export abstract class RecordBackedDocumentProvider implements DocumentStoreProvi
   }
 
   async putDocument<T>(doc: SettingsEnvelope<T>, options?: PutOptions): Promise<SettingsEnvelope<T>> {
+    // D2: the changeTag precondition comes ONLY from explicit caller
+    // expectations — never from the document's own revision, which caused
+    // spurious conflicts on plain puts. `force` opts out entirely.
+    const expectedRevision = options?.force ? undefined : options?.expectedRevision;
+
+    if (expectedRevision !== undefined) {
+      // Uniform conflict rule (D2): an expectation against a key that does
+      // not exist — or whose changeTag advanced — rejects with ConflictError.
+      const existing = await this.getRecord(doc.key);
+      if (!existing || existing.changeTag !== expectedRevision) {
+        throw new ConflictError(doc.key);
+      }
+    }
+
     const now = new Date().toISOString();
     const saved = await this.saveRecord({
       recordName: doc.key,
-      changeTag: doc.revision,
+      changeTag: expectedRevision,
       fields: {
         key: doc.key,
         schemaVersion: doc.schemaVersion,

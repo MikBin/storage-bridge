@@ -65,7 +65,10 @@ export class OneDriveProvider extends FileBackedDocumentProvider {
       'Content-Type': 'application/json',
     };
 
-    if (options?.expectedRevision !== undefined) {
+    // D2: If-Match is the Graph-side revision precondition; the manager now
+    // supplies expectedRevision on every default (post-read) write. `force`
+    // opts out into a blind last-writer-wins overwrite.
+    if (!options?.force && options?.expectedRevision !== undefined) {
       headers['If-Match'] = options.expectedRevision;
     }
 

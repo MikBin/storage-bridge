@@ -54,11 +54,10 @@ export class ICloudProvider extends RecordBackedDocumentProvider {
     return mapToCloudRecord(ckRecord);
   }
 
-  public async saveRecord(record: CloudRecord, options?: PutOptions): Promise<CloudRecord> {
-    if (options?.expectedRevision) {
-      record.changeTag = options.expectedRevision;
-    }
-
+  public async saveRecord(record: CloudRecord, _options?: PutOptions): Promise<CloudRecord> {
+    // D2: changeTag provenance lives in RecordBackedDocumentProvider — the
+    // record arrives with the changeTag already set from explicit caller
+    // expectations only (never the document's own revision).
     const ckRecord = mapFromCloudRecord(record);
     const saved = await this.client.saveRecord(ckRecord);
     return mapToCloudRecord(saved);

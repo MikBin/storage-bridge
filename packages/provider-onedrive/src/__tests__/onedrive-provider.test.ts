@@ -170,6 +170,20 @@ describe('OneDriveProvider', () => {
       const updated = await (provider as any).writeFile('free.json', '{"v":2}');
       expect(updated.revision).toBeDefined();
     });
+
+    it('writeFile with force overwrites despite a stale expectedRevision', async () => {
+      const { provider } = createProvider();
+      await (provider as any).writeFile('forced.json', '{"v":1}');
+
+      const forced = await (provider as any).writeFile('forced.json', '{"v":2}', {
+        expectedRevision: 'stale-etag',
+        force: true,
+      });
+
+      expect(forced.revision).toBeDefined();
+      const retrieved = await (provider as any).readFile('forced.json');
+      expect(retrieved!.text).toBe('{"v":2}');
+    });
   });
 
   describe('error handling', () => {

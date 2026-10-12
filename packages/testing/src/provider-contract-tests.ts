@@ -17,6 +17,7 @@ export type ContractFamily =
   | 'honest-lifecycle'
   | 'special-char-keys'
   | 'conflict-missing-key'
+  | 'conflict-force'
   | 'conflict-payload'
   | 'disconnected-operations'
   | 'error-taxonomy'
@@ -28,6 +29,7 @@ export const FAMILY_OWNERS: Readonly<Record<ContractFamily, string>> = {
   'honest-lifecycle': '02-08',
   'special-char-keys': '02-01',
   'conflict-missing-key': '02-02',
+  'conflict-force': '02-02',
   'conflict-payload': '02-05',
   'disconnected-operations': '02-04',
   'error-taxonomy': '02-06',
@@ -464,6 +466,27 @@ export function describeProviderContract(
               { expectedRevision: 'revision-of-a-never-written-key' },
             ),
           ).rejects.toThrow(ConflictError);
+        },
+      });
+    });
+
+    describe('Force Override (PutOptions.force)', () => {
+      // bypass: fast-check not installed; deterministic case (stale expectation + force).
+      declareScenario(pending, pendingScenarios, {
+        family: 'conflict-force',
+        name: 'putDocument() with force overwrites despite a stale expectedRevision',
+        body: async () => {
+          const provider = await connectedProvider(factory);
+          await provider.putDocument({ key: 'force-over', schemaVersion: 1, updatedAt: '', data: { v: 1 } });
+
+          const forced = await provider.putDocument(
+            { key: 'force-over', schemaVersion: 1, updatedAt: '', data: { v: 2 } },
+            { expectedRevision: 'stale-revision-that-does-not-match', force: true },
+          );
+          expect(forced.data).toEqual({ v: 2 });
+
+          const retrieved = await provider.getDocument<{ v: number }>('force-over');
+          expect(retrieved!.data).toEqual({ v: 2 });
         },
       });
     });

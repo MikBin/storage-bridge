@@ -96,6 +96,19 @@ export function createDropboxApiMock() {
 
       const existing = Array.from(files.values()).find(f => f.name === fileName && !f.deleted);
 
+      // Conditional update mode (D2): the upload is a server-side revision
+      // precondition — it fails with 409 when the file is missing or its
+      // current rev does not equal the expected rev.
+      const mode = arg.mode;
+      if (typeof mode === 'object' && mode !== null && mode['.tag'] === 'update') {
+        if (!existing || existing.rev !== mode.update) {
+          return new Response(JSON.stringify({ error_summary: 'revision_conflict', error: {} }), {
+            status: 409,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+      }
+
       if (existing) {
         existing.content = body;
         existing.rev = generateRev();

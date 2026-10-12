@@ -46,11 +46,11 @@ export class FakeDocumentStoreProvider implements DocumentStoreProvider {
   async putDocument<T>(doc: SettingsEnvelope<T>, options?: PutOptions): Promise<SettingsEnvelope<T>> {
     const existing = this.store.get(doc.key);
 
-    if (options?.expectedRevision !== undefined) {
-      const currentRev = existing?.revision;
-      if (currentRev !== options.expectedRevision) {
-        throw new ConflictError(doc.key);
-      }
+    // D2 semantics mirrored from the real providers: an expectation rejects
+    // on mismatch or missing key (uniform rule); force skips the check.
+    const expectedRevision = options?.force ? undefined : options?.expectedRevision;
+    if (expectedRevision !== undefined && existing?.revision !== expectedRevision) {
+      throw new ConflictError(doc.key);
     }
 
     const counter = (this.revCounters.get(doc.key) ?? 0) + 1;
