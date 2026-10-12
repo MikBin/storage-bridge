@@ -1,6 +1,6 @@
 {
   "name": "@storage-bridge/provider-icloud",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "iCloud (CloudKit private database) storage provider for @storage-bridge",
   "license": "MIT",
   "type": "module",

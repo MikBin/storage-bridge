@@ -17,10 +17,31 @@
   },
   "devDependencies": {
     "@changesets/cli": "^3.0.3",
+    "@vitest/coverage-v8": "^4.1.4",
     "eslint": "^10.2.0",
+    "fast-check": "^4.8.0",
     "prettier": "^3.6.2",
     "turbo": "^2.9.6",
     "typescript": "^6.0.2"
   },
-  "packageManager": "pnpm@10.30.3"
+  "packageManager": "pnpm@10.30.3",
+  "pnpm": {
+    "overrides": {
+      "metro": "0.81.5",
+      "metro-config": "0.81.5",
+      "metro-resolver": "0.81.5",
+      "metro-cache": "0.81.5",
+      "metro-runtime": "0.81.5",
+      "metro-transform-worker": "0.81.5",
+      "metro-transform-plugins": "0.81.5",
+      "metro-minify-uglify": "0.81.5",
+      "metro-minify-terser": "0.81.5",
+      "metro-source-map": "0.81.5",
+      "metro-symbolicate": "0.81.5",
+      "metro-core": "0.81.5",
+      "metro-inspector-proxy": "0.81.5",
+      "metro-cache-key": "0.81.5",
+      "metro-babel-transformer": "0.81.5"
+    }
+  }
 }

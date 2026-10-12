@@ -1,6 +1,6 @@
 {
   "name": "@storage-bridge/core",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Client-side settings store core: document registry, provider port, and OAuth token management",
   "license": "MIT",
   "type": "module",

@@ -81,3 +81,4 @@ export interface ProviderDescriptor {
   isSupported(): Promise<boolean>;
   create(): DocumentStoreProvider;
 }
+

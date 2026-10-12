@@ -1,4 +1,4 @@
-import { ConflictError, NotConnectedError } from '../errors.js';
+﻿import { ConflictError, NotConnectedError } from '../errors.js';
 import type {
   DocumentStoreProvider,
   ProviderId,
@@ -31,7 +31,7 @@ export abstract class RecordBackedDocumentProvider implements DocumentStoreProvi
   /**
    * Uniform pre-connect policy (02-06): every data operation rejects with
    * NotConnectedError before connect(), based on the provider's honest
-   * isConnected() answer — never with a fabricated success or a raw
+   * isConnected() answer â€” never with a fabricated success or a raw
    * transport error.
    */
   private async ensureConnected(): Promise<void> {
@@ -59,13 +59,13 @@ export abstract class RecordBackedDocumentProvider implements DocumentStoreProvi
   ): Promise<SettingsEnvelope<T>> {
     await this.ensureConnected();
     // D2: the changeTag precondition comes ONLY from explicit caller
-    // expectations — never from the document's own revision, which caused
+    // expectations â€” never from the document's own revision, which caused
     // spurious conflicts on plain puts. `force` opts out entirely.
     const expectedRevision = options?.force ? undefined : options?.expectedRevision;
 
     if (expectedRevision !== undefined) {
       // Uniform conflict rule (D2): an expectation against a key that does
-      // not exist — or whose changeTag advanced — rejects with ConflictError.
+      // not exist â€” or whose changeTag advanced â€” rejects with ConflictError.
       const existing = await this.getRecord(doc.key);
       if (!existing || existing.changeTag !== expectedRevision) {
         throw new ConflictError(doc.key);

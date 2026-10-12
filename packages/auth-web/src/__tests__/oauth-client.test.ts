@@ -130,6 +130,39 @@ describe('BrowserOAuthClient', () => {
         expect.objectContaining({ method: 'POST' }),
       );
     });
+
+    it('deduplicates concurrent refresh requests', async () => {
+      mockTokenStore.get.mockReturnValue({
+        accessToken: 'expired-token',
+        refreshToken: 'refresh-123',
+        expiresAt: Date.now() + 30000,
+        tokenType: 'Bearer',
+      });
+
+      mockFetch.mockImplementation(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        return new Response(
+          JSON.stringify({
+            access_token: 'refreshed-token-concurrent',
+            refresh_token: 'new-refresh',
+            expires_in: 3600,
+            token_type: 'Bearer',
+          }),
+          { status: 200 },
+        );
+      });
+
+      const [token1, token2, token3] = await Promise.all([
+        client.getAccessToken(),
+        client.getAccessToken(),
+        client.getAccessToken(),
+      ]);
+
+      expect(token1).toBe('refreshed-token-concurrent');
+      expect(token2).toBe('refreshed-token-concurrent');
+      expect(token3).toBe('refreshed-token-concurrent');
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('getAuthHeaders()', () => {
