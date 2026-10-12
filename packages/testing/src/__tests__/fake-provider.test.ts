@@ -69,7 +69,12 @@ describe('FakeDocumentStoreProvider', () => {
       const p = createProvider();
       await p.connect();
       await p.putDocument({ key: 'cfg', schemaVersion: 1, updatedAt: '', data: { v: 1 } });
-      const updated = await p.putDocument({ key: 'cfg', schemaVersion: 1, updatedAt: '', data: { v: 2 } });
+      const updated = await p.putDocument({
+        key: 'cfg',
+        schemaVersion: 1,
+        updatedAt: '',
+        data: { v: 2 },
+      });
       expect(updated.data).toEqual({ v: 2 });
       expect(updated.revision).toBe('rev-2');
     });
@@ -116,7 +121,7 @@ describe('FakeDocumentStoreProvider', () => {
       await p.putDocument({ key: 'b', schemaVersion: 1, updatedAt: '', data: {} });
       const list = await p.listDocuments();
       expect(list).toHaveLength(2);
-      const keys = list.map(s => s.key).sort();
+      const keys = list.map((s) => s.key).sort();
       expect(keys).toEqual(['a', 'b']);
       for (const s of list) {
         expect(s.updatedAt).toBeDefined();
@@ -155,7 +160,12 @@ describe('FakeDocumentStoreProvider', () => {
     it('putDocument with matching expectedRevision succeeds', async () => {
       const p = createProvider();
       await p.connect();
-      const doc = await p.putDocument({ key: 'conflict', schemaVersion: 1, updatedAt: '', data: {} });
+      const doc = await p.putDocument({
+        key: 'conflict',
+        schemaVersion: 1,
+        updatedAt: '',
+        data: {},
+      });
       const updated = await p.putDocument(
         { key: 'conflict', schemaVersion: 1, updatedAt: '', data: { v: 2 } },
         { expectedRevision: doc.revision },

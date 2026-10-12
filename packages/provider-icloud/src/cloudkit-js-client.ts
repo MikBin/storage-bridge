@@ -38,7 +38,10 @@ interface CloudKitJsDatabase {
   fetchRecordWithName?(recordName: string): Promise<unknown>;
   saveRecords?(records: unknown[], options?: unknown): Promise<{ records?: unknown[] }>;
   deleteRecordWithName?(recordName: string): Promise<unknown>;
-  performQuery?(query: unknown, options?: unknown): Promise<{ records?: unknown[]; continuationMarker?: unknown }>;
+  performQuery?(
+    query: unknown,
+    options?: unknown,
+  ): Promise<{ records?: unknown[]; continuationMarker?: unknown }>;
 }
 
 interface CloudKitJsContainer {
@@ -57,7 +60,7 @@ function requireCloudKitGlobal(): CloudKitJsGlobal {
   const global = (globalThis as { CloudKit?: CloudKitJsGlobal }).CloudKit;
   if (!global) {
     throw new SettingsStoreError(
-      'CloudKit JS is not available in this runtime. Load Apple\'s cloudkit.js script (web) or run inside the ' +
+      "CloudKit JS is not available in this runtime. Load Apple's cloudkit.js script (web) or run inside the " +
         'Apple runtime bridge. Real-API verification is operator-blocked pending Apple web-auth-token provisioning (D3).',
       'ICLOUD_REQUEST_ERROR',
     );

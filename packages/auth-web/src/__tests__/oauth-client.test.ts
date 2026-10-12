@@ -17,7 +17,11 @@ const mockConfig: OAuthProviderConfig = {
 describe('BrowserOAuthClient', () => {
   let client: BrowserOAuthClient;
   let mockFetch: ReturnType<typeof vi.fn>;
-  let mockTokenStore: { get: ReturnType<typeof vi.fn>; set: ReturnType<typeof vi.fn>; remove: ReturnType<typeof vi.fn> };
+  let mockTokenStore: {
+    get: ReturnType<typeof vi.fn>;
+    set: ReturnType<typeof vi.fn>;
+    remove: ReturnType<typeof vi.fn>;
+  };
 
   beforeEach(() => {
     mockFetch = vi.fn();
@@ -28,7 +32,11 @@ describe('BrowserOAuthClient', () => {
     };
     client = new BrowserOAuthClient({
       config: mockConfig,
-      tokenStore: mockTokenStore as unknown as { get: (id: string) => Promise<OAuthTokens | null>, set: (id: string, tokens: OAuthTokens) => Promise<void>, remove: (id: string) => Promise<void> },
+      tokenStore: mockTokenStore as unknown as {
+        get: (id: string) => Promise<OAuthTokens | null>;
+        set: (id: string, tokens: OAuthTokens) => Promise<void>;
+        remove: (id: string) => Promise<void>;
+      },
       fetchFn: mockFetch as unknown as typeof fetch,
     });
   });
@@ -36,7 +44,8 @@ describe('BrowserOAuthClient', () => {
   describe('login()', () => {
     it('generates PKCE, saves state, and initiates redirect', async () => {
       const originalRandomUUID = crypto.randomUUID;
-      crypto.randomUUID = () => 'test-state-uuid-test-state-uuid' as `${string}-${string}-${string}-${string}-${string}`;
+      crypto.randomUUID = () =>
+        'test-state-uuid-test-state-uuid' as `${string}-${string}-${string}-${string}-${string}`;
 
       const mockAssign = vi.fn();
       Object.defineProperty(window, 'location', {
@@ -289,7 +298,8 @@ describe('BrowserOAuthClient', () => {
         mockFetch.mockResolvedValueOnce({
           ok: false,
           status: 400,
-          text: async () => '{"error":"invalid_grant","error_description":"Code was already redeemed."}',
+          text: async () =>
+            '{"error":"invalid_grant","error_description":"Code was already redeemed."}',
         });
 
         const error = await captureRejection(completeAuthFlowCall());
@@ -339,10 +349,18 @@ describe('BrowserOAuthClient', () => {
       await mockPendingState();
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ access_token: 'a1', refresh_token: 'r1', expires_in: 3600, token_type: 'Bearer' }),
+        json: async () => ({
+          access_token: 'a1',
+          refresh_token: 'r1',
+          expires_in: 3600,
+          token_type: 'Bearer',
+        }),
       });
       await completeAuthFlowCall();
-      expect(mockTokenStore.set).toHaveBeenCalledWith('google-drive', expect.objectContaining({ accessToken: 'a1' }));
+      expect(mockTokenStore.set).toHaveBeenCalledWith(
+        'google-drive',
+        expect.objectContaining({ accessToken: 'a1' }),
+      );
 
       seedRefreshableTokens();
       mockFetch.mockResolvedValueOnce({
@@ -381,7 +399,12 @@ describe('BrowserOAuthClient', () => {
     function successResponse(): unknown {
       return {
         ok: true,
-        json: async () => ({ access_token: 'new-access', refresh_token: 'new-refresh', expires_in: 3600, token_type: 'Bearer' }),
+        json: async () => ({
+          access_token: 'new-access',
+          refresh_token: 'new-refresh',
+          expires_in: 3600,
+          token_type: 'Bearer',
+        }),
       };
     }
 
@@ -397,7 +420,10 @@ describe('BrowserOAuthClient', () => {
     });
 
     it('rejects an expired createdAt (past the 10-minute TTL) without touching the token endpoint', async () => {
-      seedPendingState({ state: 'expired-state', createdAt: Date.now() - PENDING_STATE_TTL_MS - 60_000 });
+      seedPendingState({
+        state: 'expired-state',
+        createdAt: Date.now() - PENDING_STATE_TTL_MS - 60_000,
+      });
 
       const error = await captureRejection(
         client.completeAuthFlow({ kind: 'callback', code: 'c', state: 'expired-state' }),
@@ -408,7 +434,10 @@ describe('BrowserOAuthClient', () => {
     });
 
     it('completes the exchange for a matching pending state within the TTL window', async () => {
-      seedPendingState({ state: 'fresh-state', createdAt: Date.now() - (PENDING_STATE_TTL_MS - 60_000) });
+      seedPendingState({
+        state: 'fresh-state',
+        createdAt: Date.now() - (PENDING_STATE_TTL_MS - 60_000),
+      });
       mockFetch.mockResolvedValueOnce(successResponse());
 
       await expect(
@@ -416,7 +445,10 @@ describe('BrowserOAuthClient', () => {
       ).resolves.toBeUndefined();
 
       expect(mockFetch).toHaveBeenCalledTimes(1);
-      expect(mockTokenStore.set).toHaveBeenCalledWith('google-drive', expect.objectContaining({ accessToken: 'new-access' }));
+      expect(mockTokenStore.set).toHaveBeenCalledWith(
+        'google-drive',
+        expect.objectContaining({ accessToken: 'new-access' }),
+      );
     });
 
     it('rejects an unknown state (never saved) without touching the token endpoint', async () => {
@@ -443,7 +475,11 @@ describe('BrowserOAuthClient', () => {
 
     it('rejects an error callback without touching the token endpoint', async () => {
       const error = await captureRejection(
-        client.completeAuthFlow({ kind: 'error', error: 'access_denied', error_description: 'User denied access' }),
+        client.completeAuthFlow({
+          kind: 'error',
+          error: 'access_denied',
+          error_description: 'User denied access',
+        }),
       );
 
       expect(error).toBeInstanceOf(AuthRequiredError);
@@ -473,7 +509,12 @@ describe('BrowserOAuthClient', () => {
     function successExchange(): unknown {
       return {
         ok: true,
-        json: async () => ({ access_token: ACCESS, refresh_token: REFRESH, expires_in: 3600, token_type: 'Bearer' }),
+        json: async () => ({
+          access_token: ACCESS,
+          refresh_token: REFRESH,
+          expires_in: 3600,
+          token_type: 'Bearer',
+        }),
       };
     }
 
@@ -503,7 +544,9 @@ describe('BrowserOAuthClient', () => {
       expect(authKeys, 'no sb_auth_ keys may exist in web storage by default').toEqual([]);
       for (const slot of Object.keys(universe)) {
         for (const secret of secrets) {
-          expect(String(universe[slot]), `slot ${slot} leaked token material`).not.toContain(secret);
+          expect(String(universe[slot]), `slot ${slot} leaked token material`).not.toContain(
+            secret,
+          );
         }
       }
     }
@@ -533,7 +576,11 @@ describe('BrowserOAuthClient', () => {
       seedPendingState('state-d1', 'verifier-d1');
       mockFetch.mockResolvedValueOnce(successExchange());
 
-      await inMemoryClient.completeAuthFlow({ kind: 'callback', code: 'auth-code', state: 'state-d1' });
+      await inMemoryClient.completeAuthFlow({
+        kind: 'callback',
+        code: 'auth-code',
+        state: 'state-d1',
+      });
       await expect(inMemoryClient.getAccessToken()).resolves.toBe(ACCESS);
       await inMemoryClient.getAuthHeaders();
 
@@ -570,11 +617,18 @@ describe('BrowserOAuthClient', () => {
       seedPendingState('state-optin', 'verifier-optin');
       mockFetch.mockResolvedValueOnce(successExchange());
 
-      await optInClient.completeAuthFlow({ kind: 'callback', code: 'auth-code', state: 'state-optin' });
+      await optInClient.completeAuthFlow({
+        kind: 'callback',
+        code: 'auth-code',
+        state: 'state-optin',
+      });
 
       const raw = localStorage.getItem('sb_auth_google-drive');
       expect(raw).not.toBeNull();
-      expect(JSON.parse(raw as string)).toMatchObject({ accessToken: ACCESS, refreshToken: REFRESH });
+      expect(JSON.parse(raw as string)).toMatchObject({
+        accessToken: ACCESS,
+        refreshToken: REFRESH,
+      });
     });
 
     it('post-reload simulation: fresh default client re-authenticates via the flow instead of crashing', async () => {
@@ -587,7 +641,11 @@ describe('BrowserOAuthClient', () => {
       const beforeReload = defaultClient();
       seedPendingState('state-d1', 'verifier-d1');
       mockFetch.mockResolvedValueOnce(successExchange());
-      await beforeReload.completeAuthFlow({ kind: 'callback', code: 'auth-code', state: 'state-d1' });
+      await beforeReload.completeAuthFlow({
+        kind: 'callback',
+        code: 'auth-code',
+        state: 'state-d1',
+      });
 
       // Reload: a brand-new default client finds an empty store. It must
       // surface AuthRequiredError promptly — the consumer's re-auth signal —
@@ -602,7 +660,11 @@ describe('BrowserOAuthClient', () => {
       // still zero persistence across any storage global.
       seedPendingState('state-d1-reauth', 'verifier-d1-reauth');
       mockFetch.mockResolvedValueOnce(successExchange());
-      await afterReload.completeAuthFlow({ kind: 'callback', code: 'auth-code-2', state: 'state-d1-reauth' });
+      await afterReload.completeAuthFlow({
+        kind: 'callback',
+        code: 'auth-code-2',
+        state: 'state-d1-reauth',
+      });
       await expect(afterReload.getAccessToken()).resolves.toBe(ACCESS);
 
       assertNoTokenMaterial([ACCESS, REFRESH, 'verifier-d1-reauth']);

@@ -31,13 +31,22 @@ describe('GoogleDriveProvider', () => {
     it('delegates connect to auth.login', async () => {
       let loginCalled = false;
       const auth: OAuthClient = {
-        login: async () => { loginCalled = true; },
+        login: async () => {
+          loginCalled = true;
+        },
         logout: async () => {},
         getAccessToken: async () => 'token',
-        getTokens: async () => ({ accessToken: 'token', tokenType: 'Bearer', expiresAt: Date.now() + 3600000 }),
+        getTokens: async () => ({
+          accessToken: 'token',
+          tokenType: 'Bearer',
+          expiresAt: Date.now() + 3600000,
+        }),
         getAuthHeaders: async () => ({ Authorization: 'Bearer token' }),
       };
-      const provider = new GoogleDriveProvider({ auth, fetchFn: (() => Promise.resolve(new Response())) as unknown as typeof fetch });
+      const provider = new GoogleDriveProvider({
+        auth,
+        fetchFn: (() => Promise.resolve(new Response())) as unknown as typeof fetch,
+      });
       await provider.connect();
       expect(loginCalled).toBe(true);
     });
@@ -46,12 +55,17 @@ describe('GoogleDriveProvider', () => {
       let logoutCalled = false;
       const auth: OAuthClient = {
         login: async () => {},
-        logout: async () => { logoutCalled = true; },
+        logout: async () => {
+          logoutCalled = true;
+        },
         getAccessToken: async () => 'token',
         getTokens: async () => null,
         getAuthHeaders: async () => ({ Authorization: 'Bearer token' }),
       };
-      const provider = new GoogleDriveProvider({ auth, fetchFn: (() => Promise.resolve(new Response())) as unknown as typeof fetch });
+      const provider = new GoogleDriveProvider({
+        auth,
+        fetchFn: (() => Promise.resolve(new Response())) as unknown as typeof fetch,
+      });
       await provider.disconnect();
       expect(logoutCalled).toBe(true);
     });
@@ -76,11 +90,16 @@ describe('GoogleDriveProvider', () => {
       const auth: OAuthClient = {
         login: async () => {},
         logout: async () => {},
-        getAccessToken: async () => { throw new Error('no tokens'); },
+        getAccessToken: async () => {
+          throw new Error('no tokens');
+        },
         getTokens: async () => null,
         getAuthHeaders: async () => ({ Authorization: 'Bearer token' }),
       };
-      const provider = new GoogleDriveProvider({ auth, fetchFn: (() => Promise.resolve(new Response())) as unknown as typeof fetch });
+      const provider = new GoogleDriveProvider({
+        auth,
+        fetchFn: (() => Promise.resolve(new Response())) as unknown as typeof fetch,
+      });
       expect(await provider.getProfile()).toBeNull();
     });
   });
@@ -174,7 +193,11 @@ describe('GoogleDriveProvider', () => {
         login: async () => {},
         logout: async () => {},
         getAccessToken: async () => 'bad-token',
-        getTokens: async () => ({ accessToken: 'bad-token', tokenType: 'Bearer', expiresAt: Date.now() + 3600000 }),
+        getTokens: async () => ({
+          accessToken: 'bad-token',
+          tokenType: 'Bearer',
+          expiresAt: Date.now() + 3600000,
+        }),
         getAuthHeaders: async () => ({ Authorization: 'Bearer bad-token' }),
       };
       const { mockFetch } = createDriveApiMock();
@@ -280,26 +303,43 @@ describe('GoogleDriveProvider', () => {
     it('rejects getDocument with a coded SettingsStoreError when the query fails — never silent null', async () => {
       const { provider, api } = createProvider();
       await provider.connect();
-      await provider.putDocument({ key: 'taxonomy', schemaVersion: 1, updatedAt: '', data: { v: 1 } });
+      await provider.putDocument({
+        key: 'taxonomy',
+        schemaVersion: 1,
+        updatedAt: '',
+        data: { v: 1 },
+      });
       const before = snapshotStore(api);
 
       api.setQueryFailure(500);
 
       await expect(provider.getDocument('taxonomy')).rejects.toThrow(SettingsStoreError);
-      await expect(provider.getDocument('taxonomy')).rejects.toMatchObject({ code: 'DRIVE_QUERY_ERROR' });
+      await expect(provider.getDocument('taxonomy')).rejects.toMatchObject({
+        code: 'DRIVE_QUERY_ERROR',
+      });
       expect(snapshotStore(api)).toEqual(before);
     });
 
     it('rejects putDocument when the query fails instead of silently creating a duplicate', async () => {
       const { provider, api } = createProvider();
       await provider.connect();
-      await provider.putDocument({ key: 'safe-write', schemaVersion: 1, updatedAt: '', data: { v: 1 } });
+      await provider.putDocument({
+        key: 'safe-write',
+        schemaVersion: 1,
+        updatedAt: '',
+        data: { v: 1 },
+      });
       const before = snapshotStore(api);
 
       api.setQueryFailure(500);
 
       await expect(
-        provider.putDocument({ key: 'safe-write', schemaVersion: 1, updatedAt: '', data: { v: 2 } }),
+        provider.putDocument({
+          key: 'safe-write',
+          schemaVersion: 1,
+          updatedAt: '',
+          data: { v: 2 },
+        }),
       ).rejects.toMatchObject({ code: 'DRIVE_QUERY_ERROR' });
       expect(snapshotStore(api)).toEqual(before);
     });

@@ -1,7 +1,11 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { AuthRequiredError, ConflictError, SettingsStoreError } from '@storage-bridge/core';
 import { ICloudProvider } from '../icloud-provider.js';
-import { createCloudKitClientMock, type CloudKitClientMock, type OperationFailure } from './icloud-api-mock.js';
+import {
+  createCloudKitClientMock,
+  type CloudKitClientMock,
+  type OperationFailure,
+} from './icloud-api-mock.js';
 import type { CloudKitClientConfig } from '../cloudkit-client.js';
 
 const CONFIG: CloudKitClientConfig = {
@@ -95,7 +99,7 @@ describe('ICloudProvider (injected CloudKitClient port, D3)', () => {
       await custom.listDocuments();
       await custom.deleteDocument('k');
 
-      const saveCall = mock.calls.find(c => c.method === 'saveRecord');
+      const saveCall = mock.calls.find((c) => c.method === 'saveRecord');
       expect((saveCall!.args[0] as { recordType: string }).recordType).toBe('CustomDoc');
       expect(mock.calls).toContainEqual({ method: 'fetchRecord', args: ['k', 'CustomDoc'] });
       expect(mock.calls).toContainEqual({ method: 'queryRecords', args: ['CustomDoc'] });
@@ -105,7 +109,7 @@ describe('ICloudProvider (injected CloudKitClient port, D3)', () => {
     it('defaults to the spec recordType', async () => {
       await provider.connect();
       await provider.putDocument({ key: 'k', schemaVersion: 1, updatedAt: '', data: {} });
-      const saveCall = mock.calls.find(c => c.method === 'saveRecord');
+      const saveCall = mock.calls.find((c) => c.method === 'saveRecord');
       expect((saveCall!.args[0] as { recordType: string }).recordType).toBe('SettingsDocument');
     });
   });
@@ -113,7 +117,12 @@ describe('ICloudProvider (injected CloudKitClient port, D3)', () => {
   describe('changeTag provenance (D2 preserved: explicit expectations only)', () => {
     it('plain put on an existing record sends no implicit changeTag; explicit expectedRevision is sent', async () => {
       await provider.connect();
-      const first = await provider.putDocument({ key: 'tag-prov', schemaVersion: 1, updatedAt: '', data: { v: 1 } });
+      const first = await provider.putDocument({
+        key: 'tag-prov',
+        schemaVersion: 1,
+        updatedAt: '',
+        data: { v: 1 },
+      });
 
       await provider.putDocument(
         { key: 'tag-prov', schemaVersion: 1, updatedAt: '', data: { v: 2 } },
@@ -129,7 +138,7 @@ describe('ICloudProvider (injected CloudKitClient port, D3)', () => {
         data: { v: 3 },
       });
 
-      const saves = mock.calls.filter(c => c.method === 'saveRecord');
+      const saves = mock.calls.filter((c) => c.method === 'saveRecord');
       const explicit = saves[1]!.args[0] as { recordChangeTag?: string };
       expect(explicit.recordChangeTag).toBe(first.revision);
 
@@ -157,8 +166,16 @@ describe('ICloudProvider (injected CloudKitClient port, D3)', () => {
     const AUTH_FAILURES: ReadonlyArray<{ label: string } & OperationFailure> = [
       { label: 'HTTP 401', httpStatus: 401, reason: 'unauthorized' },
       { label: 'HTTP 403', httpStatus: 403, reason: 'forbidden' },
-      { label: 'in-band AUTHENTICATION_REQUIRED', serverErrorCode: 'AUTHENTICATION_REQUIRED', reason: 'sign in' },
-      { label: 'in-band AUTHENTICATE_REQUIRED', serverErrorCode: 'AUTHENTICATE_REQUIRED', reason: 'sign in' },
+      {
+        label: 'in-band AUTHENTICATION_REQUIRED',
+        serverErrorCode: 'AUTHENTICATION_REQUIRED',
+        reason: 'sign in',
+      },
+      {
+        label: 'in-band AUTHENTICATE_REQUIRED',
+        serverErrorCode: 'AUTHENTICATE_REQUIRED',
+        reason: 'sign in',
+      },
     ];
 
     for (const failure of AUTH_FAILURES) {
@@ -175,21 +192,39 @@ describe('ICloudProvider (injected CloudKitClient port, D3)', () => {
       code: string;
       run: (p: ICloudProvider) => Promise<unknown>;
     }> = [
-      { label: 'getDocument()', operation: 'fetch', code: 'ICLOUD_RECORD_ERROR', run: p => p.getDocument('doc1') },
+      {
+        label: 'getDocument()',
+        operation: 'fetch',
+        code: 'ICLOUD_RECORD_ERROR',
+        run: (p) => p.getDocument('doc1'),
+      },
       {
         label: 'putDocument()',
         operation: 'save',
         code: 'ICLOUD_SAVE_ERROR',
-        run: p => p.putDocument({ key: 'doc1', schemaVersion: 1, updatedAt: '', data: { v: 1 } }),
+        run: (p) => p.putDocument({ key: 'doc1', schemaVersion: 1, updatedAt: '', data: { v: 1 } }),
       },
-      { label: 'deleteDocument()', operation: 'delete', code: 'ICLOUD_DELETE_ERROR', run: p => p.deleteDocument('doc1') },
-      { label: 'listDocuments()', operation: 'query', code: 'ICLOUD_REQUEST_ERROR', run: p => p.listDocuments() },
+      {
+        label: 'deleteDocument()',
+        operation: 'delete',
+        code: 'ICLOUD_DELETE_ERROR',
+        run: (p) => p.deleteDocument('doc1'),
+      },
+      {
+        label: 'listDocuments()',
+        operation: 'query',
+        code: 'ICLOUD_REQUEST_ERROR',
+        run: (p) => p.listDocuments(),
+      },
     ];
 
     for (const scenario of GENERIC_CASES) {
       it(`wraps a generic ${scenario.label} failure in coded ${scenario.code} with cause`, async () => {
         await provider.connect();
-        mock.setOperationFailure(scenario.operation, { serverErrorCode: 'UNKNOWN_ERROR', reason: 'boom' });
+        mock.setOperationFailure(scenario.operation, {
+          serverErrorCode: 'UNKNOWN_ERROR',
+          reason: 'boom',
+        });
         const error = await captureRejection(scenario.run(provider));
         expect(error).toBeInstanceOf(SettingsStoreError);
         expect((error as SettingsStoreError).code).toBe(scenario.code);
@@ -201,7 +236,12 @@ describe('ICloudProvider (injected CloudKitClient port, D3)', () => {
       await provider.connect();
       mock.setOperationFailure('save', { serverErrorCode: 'CONFLICT', reason: 'conflict' });
       const error = await captureRejection(
-        provider.putDocument({ key: 'logical-key', schemaVersion: 1, updatedAt: '', data: { v: 2 } }),
+        provider.putDocument({
+          key: 'logical-key',
+          schemaVersion: 1,
+          updatedAt: '',
+          data: { v: 2 },
+        }),
       );
       expect(error).toBeInstanceOf(ConflictError);
       expect((error as ConflictError).key).toBe('logical-key');

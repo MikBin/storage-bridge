@@ -1,9 +1,4 @@
-export type ProviderId =
-  | 'google-drive'
-  | 'dropbox'
-  | 'onedrive'
-  | 'icloud'
-  | 'local';
+export type ProviderId = 'google-drive' | 'dropbox' | 'onedrive' | 'icloud' | 'local';
 
 export type Revision = string;
 

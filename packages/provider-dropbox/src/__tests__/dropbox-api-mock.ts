@@ -63,11 +63,11 @@ export function createDropboxApiMock() {
 
   /** Serves one page of the active-file listing starting at `offset`. */
   function listPage(offset: number): Response {
-    const activeFiles = Array.from(files.values()).filter(f => !f.deleted);
+    const activeFiles = Array.from(files.values()).filter((f) => !f.deleted);
     const pageSize = listPageSize ?? activeFiles.length;
     const page = activeFiles.slice(offset, offset + pageSize);
 
-    const entries: DropboxFileRaw[] = page.map(f => ({
+    const entries: DropboxFileRaw[] = page.map((f) => ({
       id: f.id,
       name: f.name,
       '.tag': 'file',
@@ -90,8 +90,16 @@ export function createDropboxApiMock() {
     });
   }
 
-  const mockFetch = async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
-    const url = typeof input === 'string' ? new URL(input) : input instanceof URL ? input : new URL(input.url);
+  const mockFetch = async (
+    input: string | URL | Request,
+    init?: RequestInit,
+  ): Promise<Response> => {
+    const url =
+      typeof input === 'string'
+        ? new URL(input)
+        : input instanceof URL
+          ? input
+          : new URL(input.url);
     const hostname = url.hostname;
     const path = url.pathname;
     const method = init?.method ?? 'GET';
@@ -100,7 +108,9 @@ export function createDropboxApiMock() {
     const headers = init?.headers as Record<string, string> | undefined;
     const authHeader = headers?.['Authorization'];
     if (!authHeader?.startsWith('Bearer test-token')) {
-      return new Response(JSON.stringify({ error_summary: 'invalid_access_token', error: {} }), { status: 401 });
+      return new Response(JSON.stringify({ error_summary: 'invalid_access_token', error: {} }), {
+        status: 401,
+      });
     }
 
     // Server outage emulation: every authenticated endpoint answers with `status`.
@@ -112,15 +122,21 @@ export function createDropboxApiMock() {
     }
 
     // content.dropboxapi.com/2/files/download
-    if (hostname === 'content.dropboxapi.com' && path === '/2/files/download' && method === 'POST') {
+    if (
+      hostname === 'content.dropboxapi.com' &&
+      path === '/2/files/download' &&
+      method === 'POST'
+    ) {
       const argHeader = headers?.['Dropbox-API-Arg'];
       if (!argHeader) {
-        return new Response(JSON.stringify({ error_summary: 'bad_request', error: {} }), { status: 400 });
+        return new Response(JSON.stringify({ error_summary: 'bad_request', error: {} }), {
+          status: 400,
+        });
       }
       const arg = JSON.parse(argHeader);
       const filePath: string = arg.path;
       const fileName = filePath.replace(/^\//, '');
-      const file = Array.from(files.values()).find(f => f.name === fileName && !f.deleted);
+      const file = Array.from(files.values()).find((f) => f.name === fileName && !f.deleted);
 
       if (!file) {
         return new Response(JSON.stringify({ error_summary: 'path/not_found', error: {} }), {
@@ -151,14 +167,16 @@ export function createDropboxApiMock() {
     if (hostname === 'content.dropboxapi.com' && path === '/2/files/upload' && method === 'POST') {
       const argHeader = headers?.['Dropbox-API-Arg'];
       if (!argHeader) {
-        return new Response(JSON.stringify({ error_summary: 'bad_request', error: {} }), { status: 400 });
+        return new Response(JSON.stringify({ error_summary: 'bad_request', error: {} }), {
+          status: 400,
+        });
       }
       const arg = JSON.parse(argHeader);
       const filePath: string = arg.path;
       const fileName = filePath.replace(/^\//, '');
       const body = (init?.body as string) ?? '';
 
-      const existing = Array.from(files.values()).find(f => f.name === fileName && !f.deleted);
+      const existing = Array.from(files.values()).find((f) => f.name === fileName && !f.deleted);
 
       // Conditional update mode (D2): the upload is a server-side revision
       // precondition — it fails with 409 when the file is missing or its
@@ -224,7 +242,7 @@ export function createDropboxApiMock() {
       const body = JSON.parse((init?.body as string) ?? '{}');
       const filePath: string = body.path;
       const fileName = filePath.replace(/^\//, '');
-      const file = Array.from(files.values()).find(f => f.name === fileName && !f.deleted);
+      const file = Array.from(files.values()).find((f) => f.name === fileName && !f.deleted);
 
       if (!file) {
         return new Response(JSON.stringify({ error_summary: 'path/not_found', error: {} }), {
@@ -254,7 +272,11 @@ export function createDropboxApiMock() {
     }
 
     // api.dropboxapi.com/2/files/list_folder/continue (subsequent pages)
-    if (hostname === 'api.dropboxapi.com' && path === '/2/files/list_folder/continue' && method === 'POST') {
+    if (
+      hostname === 'api.dropboxapi.com' &&
+      path === '/2/files/list_folder/continue' &&
+      method === 'POST'
+    ) {
       const body = JSON.parse((init?.body as string) ?? '{}');
       const offset = decodeCursor(body.cursor);
       if (offset === null) {
@@ -266,7 +288,9 @@ export function createDropboxApiMock() {
       return listPage(offset);
     }
 
-    return new Response(JSON.stringify({ error_summary: 'unknown_endpoint', error: {} }), { status: 400 });
+    return new Response(JSON.stringify({ error_summary: 'unknown_endpoint', error: {} }), {
+      status: 400,
+    });
   };
 
   return { mockFetch, reset, setListPageSize, setGlobalFailure, files };

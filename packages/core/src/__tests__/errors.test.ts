@@ -12,7 +12,9 @@ import * as errorModule from '../errors.js';
 describe('Errors', () => {
   describe('taxonomy hygiene (02-06)', () => {
     it('no longer exports DocumentNotFoundError — it was dead taxonomy', () => {
-      expect((errorModule as { DocumentNotFoundError?: unknown }).DocumentNotFoundError).toBeUndefined();
+      expect(
+        (errorModule as { DocumentNotFoundError?: unknown }).DocumentNotFoundError,
+      ).toBeUndefined();
     });
   });
 

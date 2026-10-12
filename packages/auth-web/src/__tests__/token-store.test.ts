@@ -72,7 +72,7 @@ describe('InMemoryTokenStore (03-01 / D1 default)', () => {
   // TokenStore port (get/set/remove, provider isolation) plus a state-delta
   // over the storage globals proving the store never touches persistence.
   // Dynamic imports keep this file collectable while the class is absent.
-  function importTokenStoreModule(): Promise<typeof import('../token-store.js')> {
+  function importTokenStoreModule() {
     return import('../token-store.js');
   }
 

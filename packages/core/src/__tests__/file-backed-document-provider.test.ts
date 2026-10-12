@@ -11,15 +11,23 @@ class InMemoryFileProvider extends FileBackedDocumentProvider {
 
   async connect(): Promise<void> {}
   async disconnect(): Promise<void> {}
-  async isConnected(): Promise<boolean> { return true; }
-  async getProfile(): Promise<ConnectedProfile | null> { return { provider: this.id }; }
+  async isConnected(): Promise<boolean> {
+    return true;
+  }
+  async getProfile(): Promise<ConnectedProfile | null> {
+    return { provider: this.id };
+  }
 
   protected async readFile(fileName: string): Promise<{ text: string; meta: FileEntry } | null> {
     const entry = this.store.get(fileName);
     return entry ?? null;
   }
 
-  protected async writeFile(fileName: string, text: string, _options?: PutOptions): Promise<FileEntry> {
+  protected async writeFile(
+    fileName: string,
+    text: string,
+    _options?: PutOptions,
+  ): Promise<FileEntry> {
     this.revCounter++;
     const meta: FileEntry = {
       id: `${fileName}-${this.revCounter}`,
@@ -38,7 +46,7 @@ class InMemoryFileProvider extends FileBackedDocumentProvider {
   }
 
   protected async listFiles(): Promise<FileEntry[]> {
-    return Array.from(this.store.values()).map(e => e.meta);
+    return Array.from(this.store.values()).map((e) => e.meta);
   }
 }
 
@@ -114,7 +122,12 @@ describe('FileBackedDocumentProvider', () => {
 
     it('well-formed payloads are unaffected by the corruption guard (state-delta: round-trip unchanged)', async () => {
       const p = createProvider();
-      await p.putDocument<{ x: number }>({ key: 'healthy', schemaVersion: 1, updatedAt: '', data: { x: 1 } });
+      await p.putDocument<{ x: number }>({
+        key: 'healthy',
+        schemaVersion: 1,
+        updatedAt: '',
+        data: { x: 1 },
+      });
       const retrieved = await p.getDocument<{ x: number }>('healthy');
       expect(retrieved!.data).toEqual({ x: 1 });
     });
@@ -123,9 +136,12 @@ describe('FileBackedDocumentProvider', () => {
   describe('putDocument + getDocument', () => {
     it('creates and retrieves a document', async () => {
       const p = createProvider();
-      const doc = await p.putDocument<{ x: number }>(
-        { key: 'test', schemaVersion: 1, updatedAt: '', data: { x: 42 } },
-      );
+      const doc = await p.putDocument<{ x: number }>({
+        key: 'test',
+        schemaVersion: 1,
+        updatedAt: '',
+        data: { x: 42 },
+      });
       expect(doc.key).toBe('test');
       expect(doc.data).toEqual({ x: 42 });
       expect(doc.revision).toBeDefined();
@@ -137,8 +153,18 @@ describe('FileBackedDocumentProvider', () => {
 
     it('updates an existing document', async () => {
       const p = createProvider();
-      await p.putDocument<{ v: number }>({ key: 'cfg', schemaVersion: 1, updatedAt: '', data: { v: 1 } });
-      const updated = await p.putDocument<{ v: number }>({ key: 'cfg', schemaVersion: 1, updatedAt: '', data: { v: 2 } });
+      await p.putDocument<{ v: number }>({
+        key: 'cfg',
+        schemaVersion: 1,
+        updatedAt: '',
+        data: { v: 1 },
+      });
+      const updated = await p.putDocument<{ v: number }>({
+        key: 'cfg',
+        schemaVersion: 1,
+        updatedAt: '',
+        data: { v: 2 },
+      });
       expect(updated.data).toEqual({ v: 2 });
 
       const retrieved = await p.getDocument<{ v: number }>('cfg');
@@ -147,7 +173,12 @@ describe('FileBackedDocumentProvider', () => {
 
     it('propagates revision from file metadata', async () => {
       const p = createProvider();
-      const doc = await p.putDocument<{ x: number }>({ key: 'rev-test', schemaVersion: 1, updatedAt: '', data: { x: 1 } });
+      const doc = await p.putDocument<{ x: number }>({
+        key: 'rev-test',
+        schemaVersion: 1,
+        updatedAt: '',
+        data: { x: 1 },
+      });
       expect(doc.revision).toBe('rev-1');
     });
   });
@@ -155,7 +186,12 @@ describe('FileBackedDocumentProvider', () => {
   describe('deleteDocument', () => {
     it('removes a document', async () => {
       const p = createProvider();
-      await p.putDocument<{ x: number }>({ key: 'del-me', schemaVersion: 1, updatedAt: '', data: { x: 1 } });
+      await p.putDocument<{ x: number }>({
+        key: 'del-me',
+        schemaVersion: 1,
+        updatedAt: '',
+        data: { x: 1 },
+      });
       await p.deleteDocument('del-me');
       const result = await p.getDocument<{ x: number }>('del-me');
       expect(result).toBeNull();
@@ -176,11 +212,21 @@ describe('FileBackedDocumentProvider', () => {
 
     it('returns all stored documents as summaries', async () => {
       const p = createProvider();
-      await p.putDocument<{ a: number }>({ key: 'a', schemaVersion: 1, updatedAt: '', data: { a: 1 } });
-      await p.putDocument<{ b: number }>({ key: 'b', schemaVersion: 1, updatedAt: '', data: { b: 2 } });
+      await p.putDocument<{ a: number }>({
+        key: 'a',
+        schemaVersion: 1,
+        updatedAt: '',
+        data: { a: 1 },
+      });
+      await p.putDocument<{ b: number }>({
+        key: 'b',
+        schemaVersion: 1,
+        updatedAt: '',
+        data: { b: 2 },
+      });
       const list = await p.listDocuments();
       expect(list).toHaveLength(2);
-      const keys = list.map(s => s.key).sort();
+      const keys = list.map((s) => s.key).sort();
       expect(keys).toEqual(['a', 'b']);
       for (const s of list) {
         expect(s.updatedAt).toBeDefined();

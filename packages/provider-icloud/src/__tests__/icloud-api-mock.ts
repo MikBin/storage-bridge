@@ -1,4 +1,8 @@
-import type { CloudKitClient, CloudKitClientConfig, CloudKitRecordRaw } from '../cloudkit-client.js';
+import type {
+  CloudKitClient,
+  CloudKitClientConfig,
+  CloudKitRecordRaw,
+} from '../cloudkit-client.js';
 
 /**
  * Raw failure shape a real CloudKit transport surfaces: an HTTP status
@@ -62,7 +66,10 @@ export interface CloudKitClientMock extends CloudKitClient {
 export function createCloudKitClientMock(
   initialState: MockCloudKitState = { records: {}, counter: 0 },
 ): CloudKitClientMock {
-  let state: MockCloudKitState = { records: { ...initialState.records }, counter: initialState.counter };
+  let state: MockCloudKitState = {
+    records: { ...initialState.records },
+    counter: initialState.counter,
+  };
   let listPageSize: number | null = null;
   let globalFailureStatus: number | null = null;
   let operationFailure: { operation: MockOperation; failure: OperationFailure } | null = null;
@@ -152,7 +159,11 @@ export function createCloudKitClientMock(
       failGlobal('fetchRecord');
       failOperation('fetch', recordName);
       if (typeof recordName !== 'string' || recordName.length === 0) {
-        throw new CloudKitMockError('fetchRecord requires a non-empty recordName', undefined, 'BAD_REQUEST');
+        throw new CloudKitMockError(
+          'fetchRecord requires a non-empty recordName',
+          undefined,
+          'BAD_REQUEST',
+        );
       }
       const existing = state.records[recordName];
       if (!existing) {
@@ -167,15 +178,32 @@ export function createCloudKitClientMock(
       failGlobal('saveRecord');
       failOperation('save', record.recordName);
       if (typeof record.recordName !== 'string' || record.recordName.length === 0) {
-        throw new CloudKitMockError('saveRecord requires a non-empty recordName', undefined, 'BAD_REQUEST');
+        throw new CloudKitMockError(
+          'saveRecord requires a non-empty recordName',
+          undefined,
+          'BAD_REQUEST',
+        );
       }
       if (typeof record.recordType !== 'string' || record.recordType.length === 0) {
-        throw new CloudKitMockError('saveRecord requires a non-empty recordType', undefined, 'BAD_REQUEST');
+        throw new CloudKitMockError(
+          'saveRecord requires a non-empty recordType',
+          undefined,
+          'BAD_REQUEST',
+        );
       }
       const existing = state.records[record.recordName];
-      if (existing && record.recordChangeTag !== undefined && existing.recordChangeTag !== record.recordChangeTag) {
+      if (
+        existing &&
+        record.recordChangeTag !== undefined &&
+        existing.recordChangeTag !== record.recordChangeTag
+      ) {
         // Conflict emulation (02-05): stale changeTag → CONFLICT, payload-free.
-        throw new CloudKitMockError(`saveRecord conflict for ${record.recordName}`, 409, 'CONFLICT', 'Conflict');
+        throw new CloudKitMockError(
+          `saveRecord conflict for ${record.recordName}`,
+          409,
+          'CONFLICT',
+          'Conflict',
+        );
       }
       state.counter += 1;
       const saved: CloudKitRecordRaw = {
@@ -193,7 +221,12 @@ export function createCloudKitClientMock(
       failOperation('delete', recordName);
       if (!state.records[recordName]) {
         // The real transport rejects for missing records — idempotency is the caller's policy.
-        throw new CloudKitMockError(`deleteRecord: ${recordName} not found`, 404, 'NOT_FOUND', 'Record not found');
+        throw new CloudKitMockError(
+          `deleteRecord: ${recordName} not found`,
+          404,
+          'NOT_FOUND',
+          'Record not found',
+        );
       }
       delete state.records[recordName];
     },
@@ -202,7 +235,7 @@ export function createCloudKitClientMock(
       recordCall('queryRecords', [recordType]);
       failGlobal('queryRecords');
       failOperation('query', recordType);
-      const all = Object.values(state.records).filter(r => !r.deleted);
+      const all = Object.values(state.records).filter((r) => !r.deleted);
       // Preserved 02-03 behavior: paged answers walked via continuation
       // markers, so a broken continuation walk truncates the listing exactly
       // like the wire would.

@@ -1,0 +1,16 @@
+dist/
+node_modules/
+coverage/
+.turbo/
+.nwave/
+.kilo/
+.amp/
+.changeset/
+.github/
+agents/
+backlog/
+skills/
+docs/
+pnpm-lock.yaml
+AGENTS.md
+LICENSE

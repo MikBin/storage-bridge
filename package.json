@@ -2,14 +2,15 @@
   "name": "storage-bridge",
   "private": true,
   "engines": {
-    "node": ">= 18"
+    "node": ">=22"
   },
   "scripts": {
     "build": "turbo run build",
     "test": "turbo run test",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
-    "dev": "turbo run dev",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "release:version": "changeset version",
     "release:publish": "changeset publish --provenance",
     "release:status": "changeset status"
@@ -17,8 +18,9 @@
   "devDependencies": {
     "@changesets/cli": "^3.0.3",
     "eslint": "^10.2.0",
-    "turbo": "latest",
-    "typescript": "latest"
+    "prettier": "^3.6.2",
+    "turbo": "^2.9.6",
+    "typescript": "^6.0.2"
   },
   "packageManager": "pnpm@10.30.3"
 }

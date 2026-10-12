@@ -1,8 +1,4 @@
-import {
-  NotConnectedError,
-  ProviderUnavailableError,
-  UnsupportedProviderError,
-} from './errors.js';
+import { NotConnectedError, ProviderUnavailableError, UnsupportedProviderError } from './errors.js';
 import type {
   ConnectedProfile,
   DocumentStoreProvider,
@@ -78,7 +74,7 @@ export class DefaultSettingsStore implements SettingsStore {
     // explicit caller expectation always takes precedence.
     const expectedRevision = options?.force
       ? undefined
-      : options?.expectedRevision ?? existing?.revision;
+      : (options?.expectedRevision ?? existing?.revision);
 
     const doc: SettingsEnvelope<T> = {
       key,

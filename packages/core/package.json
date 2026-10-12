@@ -36,7 +36,7 @@
   "devDependencies": {
     "@storage-bridge/eslint-config": "workspace:*",
     "@storage-bridge/typescript-config": "workspace:*",
-    "typescript": "latest",
-    "vitest": "latest"
+    "typescript": "^6.0.2",
+    "vitest": "^4.1.4"
   }
 }

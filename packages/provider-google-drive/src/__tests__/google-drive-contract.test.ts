@@ -67,8 +67,8 @@ function createContractProvider(): GoogleDriveProvider {
 describeProviderContract('GoogleDriveProvider', createContractProvider, {
   pendingFamilies: PENDING_FAMILIES,
   pendingScenarios: PENDING_SCENARIOS,
-  withListPageSize: pageSize => () => createHarness(pageSize),
-  runWithServerError: async operation => {
+  withListPageSize: (pageSize) => () => createHarness(pageSize),
+  runWithServerError: async (operation) => {
     api.setGlobalFailure(500);
     try {
       await operation();

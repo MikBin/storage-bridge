@@ -81,8 +81,14 @@ export function isAppleRuntime(): boolean {
 // ---------------------------------------------------------------------------
 
 const AUTH_HTTP_STATUSES: ReadonlySet<number> = new Set([401, 403]);
-const AUTH_SERVER_ERROR_CODES: ReadonlySet<string> = new Set(['AUTHENTICATION_REQUIRED', 'AUTHENTICATE_REQUIRED']);
-const CONFLICT_SERVER_ERROR_CODES: ReadonlySet<string> = new Set(['CONFLICT', 'NOT_FOUND_EXISTING']);
+const AUTH_SERVER_ERROR_CODES: ReadonlySet<string> = new Set([
+  'AUTHENTICATION_REQUIRED',
+  'AUTHENTICATE_REQUIRED',
+]);
+const CONFLICT_SERVER_ERROR_CODES: ReadonlySet<string> = new Set([
+  'CONFLICT',
+  'NOT_FOUND_EXISTING',
+]);
 const NOT_FOUND_SERVER_ERROR_CODES: ReadonlySet<string> = new Set(['NOT_FOUND', 'UNKNOWN_ITEM']);
 
 function failureProperty(error: unknown, property: string): unknown {
@@ -122,7 +128,11 @@ export function isNotFoundFailure(error: unknown): boolean {
  * is already a SettingsStoreError (e.g. mapped by the concrete adapter) passes
  * through untouched so codes are never double-wrapped.
  */
-export function mapCloudKitError(error: unknown, fallbackCode: string, conflictKey?: string): SettingsStoreError {
+export function mapCloudKitError(
+  error: unknown,
+  fallbackCode: string,
+  conflictKey?: string,
+): SettingsStoreError {
   if (error instanceof SettingsStoreError) return error;
   if (isAuthFailure(error)) return new AuthRequiredError('icloud');
   if (conflictKey !== undefined && isConflictFailure(error)) return new ConflictError(conflictKey);

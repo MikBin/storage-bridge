@@ -13,10 +13,7 @@ export async function generateCodeChallenge(verifier: string): Promise<string> {
 
 function base64urlEncode(buffer: Uint8Array): string {
   const binary = Array.from(buffer)
-    .map(b => String.fromCharCode(b))
+    .map((b) => String.fromCharCode(b))
     .join('');
-  return btoa(binary)
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '');
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }

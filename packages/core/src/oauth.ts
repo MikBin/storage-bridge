@@ -112,7 +112,10 @@ async function readBodyExcerpt(response: Response): Promise<string> {
  *
  * Pure classification of the response; 200 responses return normally.
  */
-export async function requireTokenEndpointSuccess(response: Response, providerId: string): Promise<void> {
+export async function requireTokenEndpointSuccess(
+  response: Response,
+  providerId: string,
+): Promise<void> {
   if (response.ok) return;
 
   const excerpt = await readBodyExcerpt(response);
@@ -120,7 +123,10 @@ export async function requireTokenEndpointSuccess(response: Response, providerId
     throw new AuthRequiredError(providerId);
   }
 
-  throw new AuthExchangeError(providerId, new Error(`HTTP ${response.status}: ${excerpt || '<no body>'}`));
+  throw new AuthExchangeError(
+    providerId,
+    new Error(`HTTP ${response.status}: ${excerpt || '<no body>'}`),
+  );
 }
 
 interface TokenEndpointResponseJson {
@@ -168,12 +174,18 @@ export class TokenManager {
         body: params.toString(),
       });
     } catch (error) {
-      throw new AuthExchangeError(this.config.providerId, error instanceof Error ? error : new Error(String(error)));
+      throw new AuthExchangeError(
+        this.config.providerId,
+        error instanceof Error ? error : new Error(String(error)),
+      );
     }
   }
 
-  private async parseTokens(response: Response, fallbackRefreshToken?: string): Promise<OAuthTokens> {
-    const json = await response.json() as TokenEndpointResponseJson;
+  private async parseTokens(
+    response: Response,
+    fallbackRefreshToken?: string,
+  ): Promise<OAuthTokens> {
+    const json = (await response.json()) as TokenEndpointResponseJson;
     return {
       accessToken: json.access_token,
       refreshToken: json.refresh_token ?? fallbackRefreshToken,

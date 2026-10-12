@@ -20,7 +20,11 @@ export function parseCallbackUrl(url: string): ParsedCallback {
 
     const error = parsed.searchParams.get('error');
     if (error) {
-      return { kind: 'error', error, error_description: parsed.searchParams.get('error_description') };
+      return {
+        kind: 'error',
+        error,
+        error_description: parsed.searchParams.get('error_description'),
+      };
     }
 
     const code = parsed.searchParams.get('code');

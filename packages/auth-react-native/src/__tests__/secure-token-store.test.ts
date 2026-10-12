@@ -59,10 +59,7 @@ describe('SecureTokenStore', () => {
       'sb_auth_google-drive',
       expect.any(String),
     );
-    expect(SecureStore.setItemAsync).toHaveBeenCalledWith(
-      'sb_auth_dropbox',
-      expect.any(String),
-    );
+    expect(SecureStore.setItemAsync).toHaveBeenCalledWith('sb_auth_dropbox', expect.any(String));
   });
 
   it('returns null for corrupted stored data', async () => {

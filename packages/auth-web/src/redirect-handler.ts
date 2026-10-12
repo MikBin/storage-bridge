@@ -31,10 +31,7 @@ export function handleCallback(): CallbackResult | null {
 }
 
 export function savePendingState(pending: PendingAuthState): void {
-  sessionStorage.setItem(
-    `${PKCE_STORAGE_PREFIX}${pending.state}`,
-    JSON.stringify(pending),
-  );
+  sessionStorage.setItem(`${PKCE_STORAGE_PREFIX}${pending.state}`, JSON.stringify(pending));
 }
 
 export function consumePendingState(state: string): PendingAuthState | null {

@@ -33,7 +33,11 @@ export abstract class FileBackedDocumentProvider implements DocumentStoreProvide
    * opt-out into a blind last-writer-wins overwrite. A write without any
    * expectation is LWW.
    */
-  protected abstract writeFile(fileName: string, body: string, options?: PutOptions): Promise<FileEntry>;
+  protected abstract writeFile(
+    fileName: string,
+    body: string,
+    options?: PutOptions,
+  ): Promise<FileEntry>;
   protected abstract removeFile(fileName: string): Promise<void>;
   protected abstract listFiles(): Promise<FileEntry[]>;
 
@@ -52,7 +56,7 @@ export abstract class FileBackedDocumentProvider implements DocumentStoreProvide
    * from the backend listing never resolve.
    */
   protected findExactFileNameMatch(files: FileEntry[], fileName: string): FileEntry | null {
-    return files.find(file => file.name === fileName) ?? null;
+    return files.find((file) => file.name === fileName) ?? null;
   }
 
   /**
@@ -110,7 +114,10 @@ export abstract class FileBackedDocumentProvider implements DocumentStoreProvide
     return { ...parsed, key, revision: file.meta.revision ?? parsed.revision };
   }
 
-  async putDocument<T>(doc: SettingsEnvelope<T>, options?: PutOptions): Promise<SettingsEnvelope<T>> {
+  async putDocument<T>(
+    doc: SettingsEnvelope<T>,
+    options?: PutOptions,
+  ): Promise<SettingsEnvelope<T>> {
     await this.ensureConnected();
     const now = new Date().toISOString();
     const payload = JSON.stringify({ ...doc, updatedAt: now });
@@ -126,7 +133,7 @@ export abstract class FileBackedDocumentProvider implements DocumentStoreProvide
   async listDocuments(): Promise<SettingsSummary[]> {
     await this.ensureConnected();
     const files = await this.listFiles();
-    return files.map(f => ({
+    return files.map((f) => ({
       key: f.logicalKey,
       updatedAt: f.updatedAt ?? new Date(0).toISOString(),
       revision: f.revision,

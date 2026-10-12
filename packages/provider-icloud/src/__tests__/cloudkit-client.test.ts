@@ -37,7 +37,7 @@ describe('CloudKitClient port (spec lines 121-142)', () => {
       tearDown: async () => undefined,
       isAuthenticated: () => true,
       fetchRecord: async () => null,
-      saveRecord: async record => record,
+      saveRecord: async (record) => record,
       deleteRecord: async () => undefined,
       queryRecords: async () => [],
     };

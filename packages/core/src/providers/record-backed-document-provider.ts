@@ -53,7 +53,10 @@ export abstract class RecordBackedDocumentProvider implements DocumentStoreProvi
     };
   }
 
-  async putDocument<T>(doc: SettingsEnvelope<T>, options?: PutOptions): Promise<SettingsEnvelope<T>> {
+  async putDocument<T>(
+    doc: SettingsEnvelope<T>,
+    options?: PutOptions,
+  ): Promise<SettingsEnvelope<T>> {
     await this.ensureConnected();
     // D2: the changeTag precondition comes ONLY from explicit caller
     // expectations — never from the document's own revision, which caused
@@ -70,16 +73,19 @@ export abstract class RecordBackedDocumentProvider implements DocumentStoreProvi
     }
 
     const now = new Date().toISOString();
-    const saved = await this.saveRecord({
-      recordName: doc.key,
-      changeTag: expectedRevision,
-      fields: {
-        key: doc.key,
-        schemaVersion: doc.schemaVersion,
-        updatedAt: now,
-        data: doc.data,
+    const saved = await this.saveRecord(
+      {
+        recordName: doc.key,
+        changeTag: expectedRevision,
+        fields: {
+          key: doc.key,
+          schemaVersion: doc.schemaVersion,
+          updatedAt: now,
+          data: doc.data,
+        },
       },
-    }, options);
+      options,
+    );
 
     return {
       key: doc.key,
@@ -98,7 +104,7 @@ export abstract class RecordBackedDocumentProvider implements DocumentStoreProvi
   async listDocuments(): Promise<SettingsSummary[]> {
     await this.ensureConnected();
     const records = await this.listRecords();
-    return records.map(r => ({
+    return records.map((r) => ({
       key: r.recordName,
       updatedAt: String(r.fields.updatedAt ?? r.modifiedAt ?? new Date(0).toISOString()),
       revision: r.changeTag,

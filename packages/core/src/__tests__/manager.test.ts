@@ -48,7 +48,7 @@ class FakeProvider implements DocumentStoreProvider {
 
   public async putDocument<T>(
     doc: SettingsEnvelope<T>,
-    _options?: PutOptions
+    _options?: PutOptions,
   ): Promise<SettingsEnvelope<T>> {
     const newDoc = { ...doc, revision: `rev-${Date.now()}`, updatedAt: new Date().toISOString() };
     this.documents.set(doc.key, newDoc);
@@ -60,7 +60,7 @@ class FakeProvider implements DocumentStoreProvider {
   }
 
   public async listDocuments(): Promise<SettingsSummary[]> {
-    return Array.from(this.documents.values()).map(doc => ({
+    return Array.from(this.documents.values()).map((doc) => ({
       key: doc.key,
       updatedAt: doc.updatedAt,
       revision: doc.revision,
@@ -115,7 +115,7 @@ class ConcurrencyEnforcingProvider implements DocumentStoreProvider {
 
   async putDocument<T>(
     doc: SettingsEnvelope<T>,
-    options?: PutOptions
+    options?: PutOptions,
   ): Promise<SettingsEnvelope<T>> {
     const expectedRevision = options?.force ? undefined : options?.expectedRevision;
 
@@ -139,7 +139,7 @@ class ConcurrencyEnforcingProvider implements DocumentStoreProvider {
   }
 
   async listDocuments(): Promise<SettingsSummary[]> {
-    return Array.from(this.documents.values()).map(doc => ({
+    return Array.from(this.documents.values()).map((doc) => ({
       key: doc.key,
       updatedAt: doc.updatedAt,
       revision: doc.revision,
@@ -307,7 +307,7 @@ describe('DefaultSettingsStore', () => {
             data: { a: 1 },
             schemaVersion: 1,
           }),
-          { expectedRevision: 'rev-abc' }
+          { expectedRevision: 'rev-abc' },
         );
       });
 
@@ -347,7 +347,7 @@ describe('DefaultSettingsStore', () => {
           expect.arrayContaining([
             { key: 'doc1', updatedAt: '2020-01-01', revision: 'rev-1' },
             { key: 'doc2', updatedAt: '2020-01-02', revision: 'rev-2' },
-          ])
+          ]),
         );
       });
     });
@@ -390,7 +390,9 @@ describe('DefaultSettingsStore — optimistic-by-default concurrency (D2)', () =
   describe('interleaved writer case matrix', () => {
     function armReadGate(): () => void {
       let release!: () => void;
-      provider.readGate = new Promise<void>(resolve => { release = resolve; });
+      provider.readGate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
       return () => {
         provider.readGate = null;
         release();

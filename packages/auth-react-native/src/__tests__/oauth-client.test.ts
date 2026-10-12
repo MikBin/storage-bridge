@@ -21,13 +21,17 @@ vi.mock('expo-auth-session', () => {
     AuthRequest: class {
       codeVerifier = 'mock-verifier';
       promptAsync = mockPromptAsync;
-    }
+    },
   };
 });
 
 describe('ReactNativeOAuthClient', () => {
   let client: ReactNativeOAuthClient;
-  let mockTokenStore: { get: ReturnType<typeof vi.fn>; set: ReturnType<typeof vi.fn>; remove: ReturnType<typeof vi.fn> };
+  let mockTokenStore: {
+    get: ReturnType<typeof vi.fn>;
+    set: ReturnType<typeof vi.fn>;
+    remove: ReturnType<typeof vi.fn>;
+  };
   let mockFetch: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
@@ -41,7 +45,11 @@ describe('ReactNativeOAuthClient', () => {
     mockFetch = vi.fn() as unknown as ReturnType<typeof vi.fn>;
     client = new ReactNativeOAuthClient({
       config: mockConfig,
-      tokenStore: mockTokenStore as unknown as { get: (id: string) => Promise<OAuthTokens | null>, set: (id: string, tokens: OAuthTokens) => Promise<void>, remove: (id: string) => Promise<void> },
+      tokenStore: mockTokenStore as unknown as {
+        get: (id: string) => Promise<OAuthTokens | null>;
+        set: (id: string, tokens: OAuthTokens) => Promise<void>;
+        remove: (id: string) => Promise<void>;
+      },
       fetchFn: mockFetch as unknown as typeof fetch,
     });
   });
@@ -280,7 +288,8 @@ describe('ReactNativeOAuthClient', () => {
         mockFetch.mockResolvedValueOnce({
           ok: false,
           status: 400,
-          text: async () => '{"error":"invalid_grant","error_description":"Code was already redeemed."}',
+          text: async () =>
+            '{"error":"invalid_grant","error_description":"Code was already redeemed."}',
         });
 
         const error = await captureRejection(client.login());
@@ -326,7 +335,11 @@ describe('ReactNativeOAuthClient', () => {
       seedRefreshableTokens();
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ access_token: 'refreshed-native-token', expires_in: 3600, token_type: 'Bearer' }),
+        json: async () => ({
+          access_token: 'refreshed-native-token',
+          expires_in: 3600,
+          token_type: 'Bearer',
+        }),
       });
       await expect(client.getAccessToken()).resolves.toBe('refreshed-native-token');
     });
@@ -360,7 +373,12 @@ describe('ReactNativeOAuthClient', () => {
     function successResponse(): unknown {
       return {
         ok: true,
-        json: async () => ({ access_token: 'native-new-access', refresh_token: 'native-new-refresh', expires_in: 3600, token_type: 'Bearer' }),
+        json: async () => ({
+          access_token: 'native-new-access',
+          refresh_token: 'native-new-refresh',
+          expires_in: 3600,
+          token_type: 'Bearer',
+        }),
       };
     }
 
@@ -369,7 +387,11 @@ describe('ReactNativeOAuthClient', () => {
       mockFetch.mockResolvedValueOnce(successResponse());
 
       await expect(
-        client.completeAuthFlow({ kind: 'callback', code: 'native-code', state: 'native-ok-state' }),
+        client.completeAuthFlow({
+          kind: 'callback',
+          code: 'native-code',
+          state: 'native-ok-state',
+        }),
       ).resolves.toBeUndefined();
 
       const body = new URLSearchParams(mockFetch.mock.calls[0][1].body as string);
@@ -394,7 +416,10 @@ describe('ReactNativeOAuthClient', () => {
     });
 
     it('rejects an expired createdAt (past the 10-minute TTL) without touching the token endpoint', async () => {
-      seedPendingState({ state: 'native-expired-state', createdAt: Date.now() - PENDING_STATE_TTL_MS - 60_000 });
+      seedPendingState({
+        state: 'native-expired-state',
+        createdAt: Date.now() - PENDING_STATE_TTL_MS - 60_000,
+      });
 
       const error = await captureRejection(
         client.completeAuthFlow({ kind: 'callback', code: 'c', state: 'native-expired-state' }),
@@ -406,7 +431,11 @@ describe('ReactNativeOAuthClient', () => {
 
     it('rejects an error callback without touching the token endpoint', async () => {
       const error = await captureRejection(
-        client.completeAuthFlow({ kind: 'error', error: 'access_denied', error_description: 'User denied access' }),
+        client.completeAuthFlow({
+          kind: 'error',
+          error: 'access_denied',
+          error_description: 'User denied access',
+        }),
       );
 
       expect(error).toBeInstanceOf(AuthRequiredError);

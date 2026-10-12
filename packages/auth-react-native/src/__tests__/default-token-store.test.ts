@@ -18,7 +18,7 @@ vi.mock('expo-auth-session', () => {
     AuthRequest: class {
       codeVerifier = 'mock-verifier';
       promptAsync = mockPromptAsync;
-    }
+    },
   };
 });
 
@@ -115,7 +115,9 @@ describe('default token store resolution (02-07)', () => {
 
   it('rejects direct construction without a tokenStore, pointing at create() or an explicit store', () => {
     expect(() => new ReactNativeOAuthClient({ config: mockConfig })).toThrow(/tokenStore/);
-    expect(() => new ReactNativeOAuthClient({ config: mockConfig })).toThrow(/ReactNativeOAuthClient\.create/);
+    expect(() => new ReactNativeOAuthClient({ config: mockConfig })).toThrow(
+      /ReactNativeOAuthClient\.create/,
+    );
   });
 
   it('rejects when the resolved module is not a viable secure store', async () => {

@@ -11,12 +11,7 @@ import type {
   ProviderCapability,
   ProviderDescriptor,
 } from '../types.js';
-import type {
-  OAuthClient,
-  OAuthTokens,
-  OAuthProviderConfig,
-  PendingAuthState,
-} from '../index.js';
+import type { OAuthClient, OAuthTokens, OAuthProviderConfig, PendingAuthState } from '../index.js';
 
 describe('Types', () => {
   it('ProviderId has correct literals', () => {
@@ -59,14 +54,22 @@ describe('Types', () => {
   });
 
   it('SettingsStore has expected methods', () => {
-    expectTypeOf<SettingsStore['connect']>().toEqualTypeOf<(provider: ProviderId) => Promise<void>>();
+    expectTypeOf<SettingsStore['connect']>().toEqualTypeOf<
+      (provider: ProviderId) => Promise<void>
+    >();
     expectTypeOf<SettingsStore['disconnect']>().toEqualTypeOf<() => Promise<void>>();
     expectTypeOf<SettingsStore['currentProvider']>().toEqualTypeOf<() => ProviderId | null>();
     expectTypeOf<SettingsStore['isConnected']>().toEqualTypeOf<() => Promise<boolean>>();
-    expectTypeOf<SettingsStore['getProfile']>().toEqualTypeOf<() => Promise<ConnectedProfile | null>>();
+    expectTypeOf<SettingsStore['getProfile']>().toEqualTypeOf<
+      () => Promise<ConnectedProfile | null>
+    >();
 
-    expectTypeOf<SettingsStore['get']>().toEqualTypeOf<<T>(key: string) => Promise<SettingsEnvelope<T> | null>>();
-    expectTypeOf<SettingsStore['put']>().toEqualTypeOf<<T>(key: string, data: T, options?: PutOptions) => Promise<SettingsEnvelope<T>>>();
+    expectTypeOf<SettingsStore['get']>().toEqualTypeOf<
+      <T>(key: string) => Promise<SettingsEnvelope<T> | null>
+    >();
+    expectTypeOf<SettingsStore['put']>().toEqualTypeOf<
+      <T>(key: string, data: T, options?: PutOptions) => Promise<SettingsEnvelope<T>>
+    >();
     expectTypeOf<SettingsStore['delete']>().toEqualTypeOf<(key: string) => Promise<void>>();
     expectTypeOf<SettingsStore['list']>().toEqualTypeOf<() => Promise<SettingsSummary[]>>();
   });
@@ -77,12 +80,22 @@ describe('Types', () => {
     expectTypeOf<DocumentStoreProvider['connect']>().toEqualTypeOf<() => Promise<void>>();
     expectTypeOf<DocumentStoreProvider['disconnect']>().toEqualTypeOf<() => Promise<void>>();
     expectTypeOf<DocumentStoreProvider['isConnected']>().toEqualTypeOf<() => Promise<boolean>>();
-    expectTypeOf<DocumentStoreProvider['getProfile']>().toEqualTypeOf<() => Promise<ConnectedProfile | null>>();
+    expectTypeOf<DocumentStoreProvider['getProfile']>().toEqualTypeOf<
+      () => Promise<ConnectedProfile | null>
+    >();
 
-    expectTypeOf<DocumentStoreProvider['getDocument']>().toEqualTypeOf<<T>(key: string) => Promise<SettingsEnvelope<T> | null>>();
-    expectTypeOf<DocumentStoreProvider['putDocument']>().toEqualTypeOf<<T>(doc: SettingsEnvelope<T>, options?: PutOptions) => Promise<SettingsEnvelope<T>>>();
-    expectTypeOf<DocumentStoreProvider['deleteDocument']>().toEqualTypeOf<(key: string) => Promise<void>>();
-    expectTypeOf<DocumentStoreProvider['listDocuments']>().toEqualTypeOf<() => Promise<SettingsSummary[]>>();
+    expectTypeOf<DocumentStoreProvider['getDocument']>().toEqualTypeOf<
+      <T>(key: string) => Promise<SettingsEnvelope<T> | null>
+    >();
+    expectTypeOf<DocumentStoreProvider['putDocument']>().toEqualTypeOf<
+      <T>(doc: SettingsEnvelope<T>, options?: PutOptions) => Promise<SettingsEnvelope<T>>
+    >();
+    expectTypeOf<DocumentStoreProvider['deleteDocument']>().toEqualTypeOf<
+      (key: string) => Promise<void>
+    >();
+    expectTypeOf<DocumentStoreProvider['listDocuments']>().toEqualTypeOf<
+      () => Promise<SettingsSummary[]>
+    >();
   });
 
   it('ProviderCapability has correct literals', () => {
@@ -121,7 +134,9 @@ describe('OAuth port', () => {
     expectTypeOf<OAuthClient['logout']>().toEqualTypeOf<() => Promise<void>>();
     expectTypeOf<OAuthClient['getAccessToken']>().toEqualTypeOf<() => Promise<string>>();
     expectTypeOf<OAuthClient['getTokens']>().toEqualTypeOf<() => Promise<OAuthTokens | null>>();
-    expectTypeOf<OAuthClient['getAuthHeaders']>().toEqualTypeOf<() => Promise<Record<string, string>>>();
+    expectTypeOf<OAuthClient['getAuthHeaders']>().toEqualTypeOf<
+      () => Promise<Record<string, string>>
+    >();
   });
 
   it('OAuthProviderConfig has expected structure', () => {
@@ -131,7 +146,9 @@ describe('OAuth port', () => {
     expectTypeOf<OAuthProviderConfig['tokenEndpoint']>().toBeString();
     expectTypeOf<OAuthProviderConfig['redirectUri']>().toBeString();
     expectTypeOf<OAuthProviderConfig['scopes']>().toEqualTypeOf<string[]>();
-    expectTypeOf<OAuthProviderConfig['extraAuthParams']>().toEqualTypeOf<Record<string, string> | undefined>();
+    expectTypeOf<OAuthProviderConfig['extraAuthParams']>().toEqualTypeOf<
+      Record<string, string> | undefined
+    >();
   });
 
   it('PendingAuthState has expected structure', () => {

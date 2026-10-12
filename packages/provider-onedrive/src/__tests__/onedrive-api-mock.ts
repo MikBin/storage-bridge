@@ -59,15 +59,25 @@ export function createOneDriveApiMock() {
     globalFailureStatus = status;
   }
 
-  const mockFetch = async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
-    const url = typeof input === 'string' ? new URL(input) : input instanceof URL ? input : new URL(input.url);
+  const mockFetch = async (
+    input: string | URL | Request,
+    init?: RequestInit,
+  ): Promise<Response> => {
+    const url =
+      typeof input === 'string'
+        ? new URL(input)
+        : input instanceof URL
+          ? input
+          : new URL(input.url);
     const path = url.pathname;
     const method = init?.method ?? 'GET';
 
     // Auth check
     const authHeader = (init?.headers as Record<string, string>)?.['Authorization'];
     if (!authHeader?.startsWith('Bearer test-token')) {
-      return new Response(JSON.stringify({ error: { code: 'InvalidAuthenticationToken' } }), { status: 401 });
+      return new Response(JSON.stringify({ error: { code: 'InvalidAuthenticationToken' } }), {
+        status: 401,
+      });
     }
 
     // Server outage emulation: every authenticated endpoint answers with `status`.
@@ -87,7 +97,7 @@ export function createOneDriveApiMock() {
 
     // GET /children — list files (paged via $skiptoken + @odata.nextLink)
     if (relative === '/children' && method === 'GET') {
-      const all: OneDriveItemRaw[] = Array.from(files.values()).map(f => ({
+      const all: OneDriveItemRaw[] = Array.from(files.values()).map((f) => ({
         id: f.id,
         name: f.name,
         lastModifiedDateTime: f.lastModifiedDateTime,
@@ -102,7 +112,9 @@ export function createOneDriveApiMock() {
       if (skipToken !== null) {
         const parsed = Number.parseInt(skipToken, 10);
         if (Number.isNaN(parsed) || parsed < 0) {
-          return new Response(JSON.stringify({ error: { code: 'invalidSkipToken' } }), { status: 400 });
+          return new Response(JSON.stringify({ error: { code: 'invalidSkipToken' } }), {
+            status: 400,
+          });
         }
         offset = parsed;
       }
@@ -130,11 +142,13 @@ export function createOneDriveApiMock() {
       const ifMatch = (init?.headers as Record<string, string>)?.['If-Match'];
 
       // Check existing file for If-Match
-      const existing = Array.from(files.values()).find(f => f.name === fileName);
+      const existing = Array.from(files.values()).find((f) => f.name === fileName);
 
       if (ifMatch !== undefined) {
         if (!existing || existing.eTag !== ifMatch) {
-          return new Response(JSON.stringify({ error: { code: 'resourceModified' } }), { status: 412 });
+          return new Response(JSON.stringify({ error: { code: 'resourceModified' } }), {
+            status: 412,
+          });
         }
       }
 
@@ -146,14 +160,17 @@ export function createOneDriveApiMock() {
         existing.lastModifiedDateTime = new Date().toISOString();
         existing.size = body.length;
 
-        return new Response(JSON.stringify({
-          id: existing.id,
-          name: existing.name,
-          lastModifiedDateTime: existing.lastModifiedDateTime,
-          eTag: existing.eTag,
-          cTag: existing.cTag,
-          size: existing.size,
-        }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        return new Response(
+          JSON.stringify({
+            id: existing.id,
+            name: existing.name,
+            lastModifiedDateTime: existing.lastModifiedDateTime,
+            eTag: existing.eTag,
+            cTag: existing.cTag,
+            size: existing.size,
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
       }
 
       // Create new file
@@ -172,20 +189,23 @@ export function createOneDriveApiMock() {
       };
       files.set(id, file);
 
-      return new Response(JSON.stringify({
-        id: file.id,
-        name: file.name,
-        lastModifiedDateTime: file.lastModifiedDateTime,
-        eTag: file.eTag,
-        cTag: file.cTag,
-        size: file.size,
-      }), { status: 201, headers: { 'Content-Type': 'application/json' } });
+      return new Response(
+        JSON.stringify({
+          id: file.id,
+          name: file.name,
+          lastModifiedDateTime: file.lastModifiedDateTime,
+          eTag: file.eTag,
+          cTag: file.cTag,
+          size: file.size,
+        }),
+        { status: 201, headers: { 'Content-Type': 'application/json' } },
+      );
     }
 
     // GET :/{fileName}:/content — download file content
     if (contentMatch && method === 'GET') {
       const fileName = contentMatch[1];
-      const file = Array.from(files.values()).find(f => f.name === fileName);
+      const file = Array.from(files.values()).find((f) => f.name === fileName);
       if (!file) {
         return new Response(JSON.stringify({ error: { code: 'itemNotFound' } }), { status: 404 });
       }
@@ -195,24 +215,27 @@ export function createOneDriveApiMock() {
     // GET :/{fileName} — item metadata
     if (itemMatch && method === 'GET') {
       const fileName = itemMatch[1];
-      const file = Array.from(files.values()).find(f => f.name === fileName);
+      const file = Array.from(files.values()).find((f) => f.name === fileName);
       if (!file) {
         return new Response(JSON.stringify({ error: { code: 'itemNotFound' } }), { status: 404 });
       }
-      return new Response(JSON.stringify({
-        id: file.id,
-        name: file.name,
-        lastModifiedDateTime: file.lastModifiedDateTime,
-        eTag: file.eTag,
-        cTag: file.cTag,
-        size: file.size,
-      }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      return new Response(
+        JSON.stringify({
+          id: file.id,
+          name: file.name,
+          lastModifiedDateTime: file.lastModifiedDateTime,
+          eTag: file.eTag,
+          cTag: file.cTag,
+          size: file.size,
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      );
     }
 
     // DELETE :/{fileName}
     if (itemMatch && method === 'DELETE') {
       const fileName = itemMatch[1];
-      const file = Array.from(files.values()).find(f => f.name === fileName);
+      const file = Array.from(files.values()).find((f) => f.name === fileName);
       if (!file) {
         return new Response(JSON.stringify({ error: { code: 'itemNotFound' } }), { status: 404 });
       }

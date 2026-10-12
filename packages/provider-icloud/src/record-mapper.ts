@@ -1,5 +1,9 @@
 import { SettingsStoreError, type CloudRecord } from '@storage-bridge/core';
-import { DEFAULT_RECORD_TYPE, type CloudKitField, type CloudKitRecordRaw } from './cloudkit-client.js';
+import {
+  DEFAULT_RECORD_TYPE,
+  type CloudKitField,
+  type CloudKitRecordRaw,
+} from './cloudkit-client.js';
 
 /**
  * CloudKit fields are typed — arbitrary JSON objects are not valid field
@@ -15,7 +19,11 @@ function scalarField(value: unknown): CloudKitField {
 /** Map a raw CloudKit record to our CloudRecord, rehydrating the JSON payload. */
 export function mapToCloudRecord(raw: CloudKitRecordRaw): CloudRecord {
   const payloadField = raw.fields?.[PAYLOAD_FIELD];
-  if (payloadField === undefined || payloadField === null || typeof payloadField.value !== 'string') {
+  if (
+    payloadField === undefined ||
+    payloadField === null ||
+    typeof payloadField.value !== 'string'
+  ) {
     throw new SettingsStoreError(
       `CloudKit record ${raw.recordName} is missing its serialized payload string field`,
       'ICLOUD_RECORD_ERROR',
@@ -48,7 +56,10 @@ export function mapToCloudRecord(raw: CloudKitRecordRaw): CloudRecord {
 
 /** Build CloudKit record fields from a CloudRecord for saving, serializing the
  * document payload into the single string field. */
-export function mapFromCloudRecord(record: CloudRecord, recordType: string = DEFAULT_RECORD_TYPE): CloudKitRecordRaw {
+export function mapFromCloudRecord(
+  record: CloudRecord,
+  recordType: string = DEFAULT_RECORD_TYPE,
+): CloudKitRecordRaw {
   const raw: CloudKitRecordRaw = {
     recordName: record.recordName,
     recordType,

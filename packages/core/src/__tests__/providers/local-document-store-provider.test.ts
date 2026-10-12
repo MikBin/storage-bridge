@@ -8,7 +8,7 @@ import { NotConnectedError, ConflictError } from '../../errors.js';
  * for strict before/after state-delta comparisons across disconnect.
  */
 async function captureStoreState(
-  provider: LocalDocumentStoreProvider
+  provider: LocalDocumentStoreProvider,
 ): Promise<{ documents: Record<string, unknown>; summaries: unknown[] }> {
   const summaries = await provider.listDocuments();
   const documents: Record<string, unknown> = {};
@@ -46,7 +46,9 @@ describe('LocalDocumentStoreProvider', () => {
       const provider = new LocalDocumentStoreProvider();
 
       await expect(provider.getDocument('key')).rejects.toThrow(NotConnectedError);
-      await expect(provider.putDocument({ key: 'key', schemaVersion: 1, updatedAt: '', data: {} })).rejects.toThrow(NotConnectedError);
+      await expect(
+        provider.putDocument({ key: 'key', schemaVersion: 1, updatedAt: '', data: {} }),
+      ).rejects.toThrow(NotConnectedError);
       await expect(provider.deleteDocument('key')).rejects.toThrow(NotConnectedError);
       await expect(provider.listDocuments()).rejects.toThrow(NotConnectedError);
     });
@@ -59,9 +61,24 @@ describe('LocalDocumentStoreProvider', () => {
     it('disconnect() preserves documents and revisions; reconnect observes identical state', async () => {
       const provider = new LocalDocumentStoreProvider();
       await provider.connect();
-      await provider.putDocument({ key: 'persist-a', schemaVersion: 1, updatedAt: '', data: { n: 1 } });
-      await provider.putDocument({ key: 'persist-a', schemaVersion: 1, updatedAt: '', data: { n: 2 } });
-      await provider.putDocument({ key: 'persist-b', schemaVersion: 1, updatedAt: '', data: { n: 3 } });
+      await provider.putDocument({
+        key: 'persist-a',
+        schemaVersion: 1,
+        updatedAt: '',
+        data: { n: 1 },
+      });
+      await provider.putDocument({
+        key: 'persist-a',
+        schemaVersion: 1,
+        updatedAt: '',
+        data: { n: 2 },
+      });
+      await provider.putDocument({
+        key: 'persist-b',
+        schemaVersion: 1,
+        updatedAt: '',
+        data: { n: 3 },
+      });
 
       const before = await captureStoreState(provider);
 
@@ -73,7 +90,12 @@ describe('LocalDocumentStoreProvider', () => {
 
       // The per-key revision counter survived the disconnect: the next write
       // continues the sequence instead of restarting at rev-1.
-      const nextPut = await provider.putDocument({ key: 'persist-a', schemaVersion: 1, updatedAt: '', data: { n: 4 } });
+      const nextPut = await provider.putDocument({
+        key: 'persist-a',
+        schemaVersion: 1,
+        updatedAt: '',
+        data: { n: 4 },
+      });
       expect(nextPut.revision).toBe('rev-3');
     });
 
@@ -137,7 +159,9 @@ describe('LocalDocumentStoreProvider', () => {
       await provider.putDocument(doc);
 
       const doc2 = { key: 'test', schemaVersion: 1, updatedAt: '', data: { foo: 'baz' } };
-      await expect(provider.putDocument(doc2, { expectedRevision: 'rev-999' })).rejects.toThrow(ConflictError);
+      await expect(provider.putDocument(doc2, { expectedRevision: 'rev-999' })).rejects.toThrow(
+        ConflictError,
+      );
     });
 
     it('putDocument with force overwrites despite a stale expectedRevision (D2)', async () => {
@@ -169,8 +193,8 @@ describe('LocalDocumentStoreProvider', () => {
 
       const summaries = await provider.listDocuments();
       expect(summaries).toHaveLength(2);
-      expect(summaries.map(s => s.key)).toContain('test1');
-      expect(summaries.map(s => s.key)).toContain('test2');
+      expect(summaries.map((s) => s.key)).toContain('test1');
+      expect(summaries.map((s) => s.key)).toContain('test2');
       expect(summaries[0].revision).toBeDefined();
       expect(summaries[0].updatedAt).not.toBe('');
     });

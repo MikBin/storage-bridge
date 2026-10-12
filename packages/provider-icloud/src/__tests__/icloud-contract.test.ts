@@ -27,8 +27,8 @@ const PENDING_SCENARIOS: readonly string[] = [];
 describeProviderContract('ICloudProvider', () => createHarness(), {
   pendingFamilies: PENDING_FAMILIES,
   pendingScenarios: PENDING_SCENARIOS,
-  withListPageSize: pageSize => () => createHarness(pageSize),
-  runWithServerError: async operation => {
+  withListPageSize: (pageSize) => () => createHarness(pageSize),
+  runWithServerError: async (operation) => {
     clientMock.setGlobalFailure(500);
     try {
       await operation();

@@ -61,13 +61,18 @@ export class OneDriveProvider extends FileBackedDocumentProvider {
 
     if (res.status === 404) return null;
     if (res.status === 401 || res.status === 403) throw new AuthRequiredError(this.id);
-    if (!res.ok) throw new SettingsStoreError(`OneDrive read failed: ${res.status}`, 'ONEDRIVE_READ_ERROR');
+    if (!res.ok)
+      throw new SettingsStoreError(`OneDrive read failed: ${res.status}`, 'ONEDRIVE_READ_ERROR');
 
     const meta = await this.getItemMetadata(fileName);
     return { text: await res.text(), meta };
   }
 
-  protected async writeFile(fileName: string, body: string, options?: PutOptions): Promise<FileEntry> {
+  protected async writeFile(
+    fileName: string,
+    body: string,
+    options?: PutOptions,
+  ): Promise<FileEntry> {
     const headers: Record<string, string> = {
       ...(await this.auth.getAuthHeaders()),
       'Content-Type': 'application/json',
@@ -89,9 +94,10 @@ export class OneDriveProvider extends FileBackedDocumentProvider {
     // Payload is the caller's logical key, never the encoded remote name.
     if (res.status === 412) throw new ConflictError(this.fileNameToKey(fileName));
     if (res.status === 401 || res.status === 403) throw new AuthRequiredError(this.id);
-    if (!res.ok) throw new SettingsStoreError(`OneDrive write failed: ${res.status}`, 'ONEDRIVE_WRITE_ERROR');
+    if (!res.ok)
+      throw new SettingsStoreError(`OneDrive write failed: ${res.status}`, 'ONEDRIVE_WRITE_ERROR');
 
-    return toFileEntry(await res.json() as OneDriveItemRaw, (n) => this.fileNameToKey(n));
+    return toFileEntry((await res.json()) as OneDriveItemRaw, (n) => this.fileNameToKey(n));
   }
 
   protected async removeFile(fileName: string): Promise<void> {
@@ -102,7 +108,11 @@ export class OneDriveProvider extends FileBackedDocumentProvider {
 
     if (res.status === 404) return;
     if (res.status === 401 || res.status === 403) throw new AuthRequiredError(this.id);
-    if (!res.ok) throw new SettingsStoreError(`OneDrive delete failed: ${res.status}`, 'ONEDRIVE_DELETE_ERROR');
+    if (!res.ok)
+      throw new SettingsStoreError(
+        `OneDrive delete failed: ${res.status}`,
+        'ONEDRIVE_DELETE_ERROR',
+      );
   }
 
   protected async listFiles(): Promise<FileEntry[]> {
@@ -117,10 +127,11 @@ export class OneDriveProvider extends FileBackedDocumentProvider {
       });
 
       if (res.status === 401 || res.status === 403) throw new AuthRequiredError(this.id);
-      if (!res.ok) throw new SettingsStoreError(`OneDrive list failed: ${res.status}`, 'ONEDRIVE_LIST_ERROR');
+      if (!res.ok)
+        throw new SettingsStoreError(`OneDrive list failed: ${res.status}`, 'ONEDRIVE_LIST_ERROR');
 
-      const json = await res.json() as { value?: OneDriveItemRaw[]; '@odata.nextLink'?: string };
-      items.push(...(json.value ?? []).map(v => toFileEntry(v, (n) => this.fileNameToKey(n))));
+      const json = (await res.json()) as { value?: OneDriveItemRaw[]; '@odata.nextLink'?: string };
+      items.push(...(json.value ?? []).map((v) => toFileEntry(v, (n) => this.fileNameToKey(n))));
       url = json['@odata.nextLink'];
     }
 
@@ -132,7 +143,11 @@ export class OneDriveProvider extends FileBackedDocumentProvider {
       headers: await this.auth.getAuthHeaders(),
     });
 
-    if (!res.ok) throw new SettingsStoreError(`OneDrive metadata failed: ${res.status}`, 'ONEDRIVE_META_ERROR');
-    return toFileEntry(await res.json() as OneDriveItemRaw, (n) => this.fileNameToKey(n));
+    if (!res.ok)
+      throw new SettingsStoreError(
+        `OneDrive metadata failed: ${res.status}`,
+        'ONEDRIVE_META_ERROR',
+      );
+    return toFileEntry((await res.json()) as OneDriveItemRaw, (n) => this.fileNameToKey(n));
   }
 }

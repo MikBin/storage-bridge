@@ -33,10 +33,16 @@ describe('DropboxProvider', () => {
     it('delegates connect to auth.login', async () => {
       let loginCalled = false;
       const auth: OAuthClient = {
-        login: async () => { loginCalled = true; },
+        login: async () => {
+          loginCalled = true;
+        },
         logout: async () => {},
         getAccessToken: async () => 'token',
-        getTokens: async () => ({ accessToken: 'token', tokenType: 'Bearer', expiresAt: Date.now() + 3600000 }),
+        getTokens: async () => ({
+          accessToken: 'token',
+          tokenType: 'Bearer',
+          expiresAt: Date.now() + 3600000,
+        }),
         getAuthHeaders: async () => ({ Authorization: 'Bearer token' }),
       };
       const provider = new DropboxProvider({ auth, fetchFn: noopFetch });
@@ -48,7 +54,9 @@ describe('DropboxProvider', () => {
       let logoutCalled = false;
       const auth: OAuthClient = {
         login: async () => {},
-        logout: async () => { logoutCalled = true; },
+        logout: async () => {
+          logoutCalled = true;
+        },
         getAccessToken: async () => 'token',
         getTokens: async () => null,
         getAuthHeaders: async () => ({ Authorization: 'Bearer token' }),
@@ -78,7 +86,9 @@ describe('DropboxProvider', () => {
       const auth: OAuthClient = {
         login: async () => {},
         logout: async () => {},
-        getAccessToken: async () => { throw new Error('no tokens'); },
+        getAccessToken: async () => {
+          throw new Error('no tokens');
+        },
         getTokens: async () => null,
         getAuthHeaders: async () => ({ Authorization: 'Bearer token' }),
       };
@@ -135,7 +145,7 @@ describe('DropboxProvider', () => {
       await provider.writeFile('b.json', '{}');
       const files = await provider.listFiles();
       expect(files).toHaveLength(2);
-      const keys = files.map(f => f.name).sort();
+      const keys = files.map((f) => f.name).sort();
       expect(keys).toEqual(['a.json', 'b.json']);
     });
   });
@@ -271,10 +281,12 @@ describe('DropboxProvider', () => {
       // The target revision lives beyond page 1 of the listing; a truncated
       // listing view is exactly what used to feed the duplicate-create path.
       const listing = await provider.listFiles();
-      const target = listing.find(f => f.name === 'bulk-14.json');
+      const target = listing.find((f) => f.name === 'bulk-14.json');
       expect(target).toBeDefined();
 
-      await provider.writeFile('bulk-14.json', '{"i":"updated"}', { expectedRevision: target!.revision });
+      await provider.writeFile('bulk-14.json', '{"i":"updated"}', {
+        expectedRevision: target!.revision,
+      });
 
       const after = snapshotStore(api);
       expect(after.fileCount).toBe(before.fileCount);
@@ -290,7 +302,11 @@ describe('DropboxProvider', () => {
         login: async () => {},
         logout: async () => {},
         getAccessToken: async () => 'bad-token',
-        getTokens: async () => ({ accessToken: 'bad-token', tokenType: 'Bearer', expiresAt: Date.now() + 3600000 }),
+        getTokens: async () => ({
+          accessToken: 'bad-token',
+          tokenType: 'Bearer',
+          expiresAt: Date.now() + 3600000,
+        }),
         getAuthHeaders: async () => ({ Authorization: 'Bearer bad-token' }),
       };
       const { mockFetch } = createDropboxApiMock();

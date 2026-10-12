@@ -51,8 +51,8 @@ function createHarness(listPageSize?: number): OneDriveProvider {
 
 describeProviderContract('OneDriveProvider', () => createHarness(), {
   pendingFamilies: PENDING_FAMILIES,
-  withListPageSize: pageSize => () => createHarness(pageSize),
-  runWithServerError: async operation => {
+  withListPageSize: (pageSize) => () => createHarness(pageSize),
+  runWithServerError: async (operation) => {
     api.setGlobalFailure(500);
     try {
       await operation();

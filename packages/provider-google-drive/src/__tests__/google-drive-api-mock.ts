@@ -76,8 +76,16 @@ export function createDriveApiMock() {
     return Number.isNaN(parsed) ? 0 : parsed;
   }
 
-  const mockFetch = async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
-    const url = typeof input === 'string' ? new URL(input) : input instanceof URL ? input : new URL(input.url);
+  const mockFetch = async (
+    input: string | URL | Request,
+    init?: RequestInit,
+  ): Promise<Response> => {
+    const url =
+      typeof input === 'string'
+        ? new URL(input)
+        : input instanceof URL
+          ? input
+          : new URL(input.url);
     const path = url.pathname;
     const method = init?.method ?? 'GET';
 
@@ -103,18 +111,18 @@ export function createDriveApiMock() {
         });
       }
 
-      let results = Array.from(files.values()).filter(f => !f.trashed);
+      let results = Array.from(files.values()).filter((f) => !f.trashed);
 
       const nameLiteral = extractQueryNameLiteral(q);
       if (nameLiteral !== null) {
-        results = results.filter(f => f.name === nameLiteral);
+        results = results.filter((f) => f.name === nameLiteral);
       }
 
       const pageSize = listPageSize ?? results.length;
       const offset = resolvePageToken(url.searchParams.get('pageToken'));
       const page = results.slice(offset, offset + pageSize);
 
-      const responseFiles: GoogleDriveFileRaw[] = page.map(f => ({
+      const responseFiles: GoogleDriveFileRaw[] = page.map((f) => ({
         id: f.id,
         name: f.name,
         mimeType: f.mimeType,
@@ -123,7 +131,9 @@ export function createDriveApiMock() {
         version: String(f.version),
       }));
 
-      const body: { files: GoogleDriveFileRaw[]; nextPageToken?: string } = { files: responseFiles };
+      const body: { files: GoogleDriveFileRaw[]; nextPageToken?: string } = {
+        files: responseFiles,
+      };
       if (offset + pageSize < results.length) {
         body.nextPageToken = `page-${offset + pageSize}`;
       }
@@ -145,10 +155,17 @@ export function createDriveApiMock() {
 
       for (const part of parts) {
         if (part.includes('application/json; charset=UTF-8') && !part.includes('"data"')) {
-          const jsonStr = part.split('\r\n\r\n')[1]?.replace(/\r\n--.*/, '').trim();
+          const jsonStr = part
+            .split('\r\n\r\n')[1]
+            ?.replace(/\r\n--.*/, '')
+            .trim();
           if (jsonStr) metadata = JSON.parse(jsonStr);
         } else if (part.includes('application/json') && part.includes('"data"')) {
-          content = part.split('\r\n\r\n')[1]?.replace(/\r\n--.*/, '').trim() ?? '';
+          content =
+            part
+              .split('\r\n\r\n')[1]
+              ?.replace(/\r\n--.*/, '')
+              .trim() ?? '';
         }
       }
 
@@ -164,13 +181,16 @@ export function createDriveApiMock() {
       };
       files.set(id, file);
 
-      return new Response(JSON.stringify({
-        id: file.id,
-        name: file.name,
-        modifiedTime: file.modifiedTime,
-        version: String(file.version),
-        size: String(file.content.length),
-      }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      return new Response(
+        JSON.stringify({
+          id: file.id,
+          name: file.name,
+          modifiedTime: file.modifiedTime,
+          version: String(file.version),
+          size: String(file.content.length),
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      );
     }
 
     const fileIdMatch = path.match(/\/files\/([^/?]+)/);
@@ -191,13 +211,16 @@ export function createDriveApiMock() {
       if (!file || file.trashed) {
         return new Response(JSON.stringify({ error: { code: 404 } }), { status: 404 });
       }
-      return new Response(JSON.stringify({
-        id: file.id,
-        name: file.name,
-        modifiedTime: file.modifiedTime,
-        version: String(file.version),
-        size: String(file.content.length),
-      }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      return new Response(
+        JSON.stringify({
+          id: file.id,
+          name: file.name,
+          modifiedTime: file.modifiedTime,
+          version: String(file.version),
+          size: String(file.content.length),
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      );
     }
 
     if (method === 'PATCH' || method === 'PUT') {
@@ -208,13 +231,16 @@ export function createDriveApiMock() {
       file.version += 1;
       file.modifiedTime = new Date().toISOString();
 
-      return new Response(JSON.stringify({
-        id: file.id,
-        name: file.name,
-        modifiedTime: file.modifiedTime,
-        version: String(file.version),
-        size: String(file.content.length),
-      }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      return new Response(
+        JSON.stringify({
+          id: file.id,
+          name: file.name,
+          modifiedTime: file.modifiedTime,
+          version: String(file.version),
+          size: String(file.content.length),
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      );
     }
 
     if (method === 'DELETE') {

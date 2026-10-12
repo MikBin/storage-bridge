@@ -31,13 +31,18 @@ describe('OneDriveProvider', () => {
     it('delegates connect to auth.login', async () => {
       let loginCalled = false;
       const auth: OAuthClient = {
-        login: async () => { loginCalled = true; },
+        login: async () => {
+          loginCalled = true;
+        },
         logout: async () => {},
         getAccessToken: async () => 'token',
         getTokens: async () => ({ accessToken: 'token', tokenType: 'Bearer' }),
         getAuthHeaders: async () => ({ Authorization: 'Bearer token' }),
       };
-      const provider = new OneDriveProvider({ auth, fetchFn: (() => {}) as unknown as typeof fetch });
+      const provider = new OneDriveProvider({
+        auth,
+        fetchFn: (() => {}) as unknown as typeof fetch,
+      });
       await provider.connect();
       expect(loginCalled).toBe(true);
     });
@@ -46,12 +51,17 @@ describe('OneDriveProvider', () => {
       let logoutCalled = false;
       const auth: OAuthClient = {
         login: async () => {},
-        logout: async () => { logoutCalled = true; },
+        logout: async () => {
+          logoutCalled = true;
+        },
         getAccessToken: async () => 'token',
         getTokens: async () => null,
         getAuthHeaders: async () => ({ Authorization: 'Bearer token' }),
       };
-      const provider = new OneDriveProvider({ auth, fetchFn: (() => {}) as unknown as typeof fetch });
+      const provider = new OneDriveProvider({
+        auth,
+        fetchFn: (() => {}) as unknown as typeof fetch,
+      });
       await provider.disconnect();
       expect(logoutCalled).toBe(true);
     });
@@ -76,11 +86,16 @@ describe('OneDriveProvider', () => {
       const auth: OAuthClient = {
         login: async () => {},
         logout: async () => {},
-        getAccessToken: async () => { throw new Error('no tokens'); },
+        getAccessToken: async () => {
+          throw new Error('no tokens');
+        },
         getTokens: async () => null,
         getAuthHeaders: async () => ({ Authorization: 'Bearer token' }),
       };
-      const provider = new OneDriveProvider({ auth, fetchFn: (() => {}) as unknown as typeof fetch });
+      const provider = new OneDriveProvider({
+        auth,
+        fetchFn: (() => {}) as unknown as typeof fetch,
+      });
       expect(await provider.getProfile()).toBeNull();
     });
   });

@@ -1,4 +1,4 @@
-import {
+import type {
   ProviderId,
   SettingsEnvelope,
   SettingsSummary,
@@ -50,7 +50,7 @@ export class LocalDocumentStoreProvider implements DocumentStoreProvider {
 
   async putDocument<T>(
     doc: SettingsEnvelope<T>,
-    options?: PutOptions
+    options?: PutOptions,
   ): Promise<SettingsEnvelope<T>> {
     this.ensureConnected();
 

@@ -66,7 +66,8 @@ export class DropboxProvider extends FileBackedDocumentProvider {
 
     if (res.status === 409) return null;
     if (res.status === 401 || res.status === 403) throw new AuthRequiredError(this.id);
-    if (!res.ok) throw new SettingsStoreError(`Dropbox read failed: ${res.status}`, 'DROPBOX_READ_ERROR');
+    if (!res.ok)
+      throw new SettingsStoreError(`Dropbox read failed: ${res.status}`, 'DROPBOX_READ_ERROR');
 
     const metaHeader = res.headers.get('Dropbox-API-Result') ?? '{}';
 
@@ -77,7 +78,9 @@ export class DropboxProvider extends FileBackedDocumentProvider {
     try {
       const parsed: unknown = JSON.parse(metaHeader);
       if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-        throw new Error(`Parsed metadata is ${parsed === null ? 'null' : Array.isArray(parsed) ? 'array' : typeof parsed} instead of an object`);
+        throw new Error(
+          `Parsed metadata is ${parsed === null ? 'null' : Array.isArray(parsed) ? 'array' : typeof parsed} instead of an object`,
+        );
       }
       raw = parsed as DropboxFileRaw;
     } catch (error) {
@@ -107,9 +110,10 @@ export class DropboxProvider extends FileBackedDocumentProvider {
     // Payload is the caller's logical key, never the encoded remote name.
     if (res.status === 409) throw new ConflictError(this.fileNameToKey(fileName));
     if (res.status === 401 || res.status === 403) throw new AuthRequiredError(this.id);
-    if (!res.ok) throw new SettingsStoreError(`Dropbox write failed: ${res.status}`, 'DROPBOX_WRITE_ERROR');
+    if (!res.ok)
+      throw new SettingsStoreError(`Dropbox write failed: ${res.status}`, 'DROPBOX_WRITE_ERROR');
 
-    return toFileEntry(await res.json() as DropboxFileRaw, (n) => this.fileNameToKey(n));
+    return toFileEntry((await res.json()) as DropboxFileRaw, (n) => this.fileNameToKey(n));
   }
 
   public async removeFile(fileName: string): Promise<void> {
@@ -124,7 +128,8 @@ export class DropboxProvider extends FileBackedDocumentProvider {
 
     if (res.status === 409) return;
     if (res.status === 401 || res.status === 403) throw new AuthRequiredError(this.id);
-    if (!res.ok) throw new SettingsStoreError(`Dropbox delete failed: ${res.status}`, 'DROPBOX_DELETE_ERROR');
+    if (!res.ok)
+      throw new SettingsStoreError(`Dropbox delete failed: ${res.status}`, 'DROPBOX_DELETE_ERROR');
   }
 
   public async listFiles(): Promise<FileEntry[]> {
@@ -137,7 +142,9 @@ export class DropboxProvider extends FileBackedDocumentProvider {
     // duplicate-create corruption path).
     do {
       const res = await this.fetchFn(
-        cursor === undefined ? `${API_BASE}/2/files/list_folder` : `${API_BASE}/2/files/list_folder/continue`,
+        cursor === undefined
+          ? `${API_BASE}/2/files/list_folder`
+          : `${API_BASE}/2/files/list_folder/continue`,
         {
           method: 'POST',
           headers: {
@@ -149,13 +156,18 @@ export class DropboxProvider extends FileBackedDocumentProvider {
       );
 
       if (res.status === 401 || res.status === 403) throw new AuthRequiredError(this.id);
-      if (!res.ok) throw new SettingsStoreError(`Dropbox list failed: ${res.status}`, 'DROPBOX_LIST_ERROR');
+      if (!res.ok)
+        throw new SettingsStoreError(`Dropbox list failed: ${res.status}`, 'DROPBOX_LIST_ERROR');
 
-      const json = await res.json() as { entries?: DropboxFileRaw[]; has_more?: boolean; cursor?: string };
+      const json = (await res.json()) as {
+        entries?: DropboxFileRaw[];
+        has_more?: boolean;
+        cursor?: string;
+      };
       entries.push(
         ...(json.entries ?? [])
-          .filter(e => e['.tag'] === 'file')
-          .map(e => toFileEntry(e, (n) => this.fileNameToKey(n))),
+          .filter((e) => e['.tag'] === 'file')
+          .map((e) => toFileEntry(e, (n) => this.fileNameToKey(n))),
       );
       cursor = json.has_more === true && typeof json.cursor === 'string' ? json.cursor : undefined;
     } while (cursor !== undefined);

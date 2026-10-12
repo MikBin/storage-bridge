@@ -33,7 +33,7 @@ export const FAMILY_OWNERS: Readonly<Record<ContractFamily, string>> = {
   'conflict-payload': '02-05',
   'disconnected-operations': '02-04',
   'error-taxonomy': '02-06',
-  'pagination': '02-03',
+  pagination: '02-03',
   'server-errors': '02-03',
 };
 
@@ -49,10 +49,7 @@ export const FAMILY_OWNERS: Readonly<Record<ContractFamily, string>> = {
  * hook-gated (an in-memory store cannot emulate pagination or 5xx faults),
  * so they register as `it.todo` scaffolds, not `it.fails`.
  */
-export const DEFAULT_PENDING_FAMILIES: readonly ContractFamily[] = [
-  'pagination',
-  'server-errors',
-];
+export const DEFAULT_PENDING_FAMILIES: readonly ContractFamily[] = ['pagination', 'server-errors'];
 
 /** Harness hooks that must be provided before a family's scenarios can run. */
 export interface ContractSuiteHooks {
@@ -99,11 +96,19 @@ interface SpecialCharKey {
 }
 
 const SPECIAL_CHAR_KEYS: ReadonlyArray<SpecialCharKey> = [
-  { label: 'an apostrophe', key: "settings-user's-doc", scenarioId: 'special-char-keys:apostrophe' },
+  {
+    label: 'an apostrophe',
+    key: "settings-user's-doc",
+    scenarioId: 'special-char-keys:apostrophe',
+  },
   { label: 'a space', key: 'settings doc with spaces', scenarioId: 'special-char-keys:space' },
   { label: 'a slash', key: 'settings/deep/nested', scenarioId: 'special-char-keys:slash' },
   { label: 'a colon', key: 'settings:section:key', scenarioId: 'special-char-keys:colon' },
-  { label: 'unicode characters', key: 'réglages-中文-настройки', scenarioId: 'special-char-keys:unicode' },
+  {
+    label: 'unicode characters',
+    key: 'réglages-中文-настройки',
+    scenarioId: 'special-char-keys:unicode',
+  },
   { label: 'an emoji', key: 'settings-🚀-doc', scenarioId: 'special-char-keys:emoji' },
 ];
 
@@ -135,7 +140,8 @@ function declareScenario(
     return;
   }
 
-  const isPending = pending.has(family) || (scenarioId !== undefined && pendingScenarios.has(scenarioId));
+  const isPending =
+    pending.has(family) || (scenarioId !== undefined && pendingScenarios.has(scenarioId));
   if (isPending) {
     it.fails(`${name} [pending ${FAMILY_OWNERS[family]}]`, body!);
     return;
@@ -305,8 +311,18 @@ export function describeProviderContract(
 
       it('multiple keys can coexist independently', async () => {
         const provider = await connectedProvider(factory);
-        await provider.putDocument({ key: 'key-a', schemaVersion: 1, updatedAt: '', data: { a: 1 } });
-        await provider.putDocument({ key: 'key-b', schemaVersion: 1, updatedAt: '', data: { b: 2 } });
+        await provider.putDocument({
+          key: 'key-a',
+          schemaVersion: 1,
+          updatedAt: '',
+          data: { a: 1 },
+        });
+        await provider.putDocument({
+          key: 'key-b',
+          schemaVersion: 1,
+          updatedAt: '',
+          data: { b: 2 },
+        });
         const a = await provider.getDocument<{ a: number }>('key-a');
         const b = await provider.getDocument<{ b: number }>('key-b');
         expect(a!.data).toEqual({ a: 1 });
@@ -315,8 +331,18 @@ export function describeProviderContract(
 
       it('overwriting an existing key updates its data', async () => {
         const provider = await connectedProvider(factory);
-        await provider.putDocument<{ v: number }>({ key: 'overwrite', schemaVersion: 1, updatedAt: '', data: { v: 1 } });
-        await provider.putDocument<{ v: number }>({ key: 'overwrite', schemaVersion: 1, updatedAt: '', data: { v: 2 } });
+        await provider.putDocument<{ v: number }>({
+          key: 'overwrite',
+          schemaVersion: 1,
+          updatedAt: '',
+          data: { v: 1 },
+        });
+        await provider.putDocument<{ v: number }>({
+          key: 'overwrite',
+          schemaVersion: 1,
+          updatedAt: '',
+          data: { v: 2 },
+        });
         const retrieved = await provider.getDocument<{ v: number }>('overwrite');
         expect(retrieved!.data).toEqual({ v: 2 });
       });
@@ -332,7 +358,12 @@ export function describeProviderContract(
           body: async () => {
             const provider = await connectedProvider(factory);
             const data = { marker: label };
-            const stored = await provider.putDocument({ key, schemaVersion: 1, updatedAt: '', data });
+            const stored = await provider.putDocument({
+              key,
+              schemaVersion: 1,
+              updatedAt: '',
+              data,
+            });
             expect(stored.key).toBe(key);
 
             const retrieved = await provider.getDocument<{ marker: string }>(key);
@@ -352,8 +383,8 @@ export function describeProviderContract(
             await provider.putDocument({ key, schemaVersion: 1, updatedAt: '', data: {} });
           }
 
-          const keys = (await provider.listDocuments()).map(summary => summary.key).sort();
-          expect(keys).toEqual(SPECIAL_CHAR_KEYS.map(entry => entry.key).sort());
+          const keys = (await provider.listDocuments()).map((summary) => summary.key).sort();
+          expect(keys).toEqual(SPECIAL_CHAR_KEYS.map((entry) => entry.key).sort());
         },
       });
     });
@@ -370,7 +401,7 @@ export function describeProviderContract(
         await provider.putDocument({ key: 'list-b', schemaVersion: 1, updatedAt: '', data: {} });
         const list = await provider.listDocuments();
         expect(list).toHaveLength(2);
-        const keys = list.map(s => s.key).sort();
+        const keys = list.map((s) => s.key).sort();
         expect(keys).toEqual(['list-a', 'list-b']);
       });
 
@@ -407,8 +438,18 @@ export function describeProviderContract(
 
       it('deleting one document does not affect others', async () => {
         const provider = await connectedProvider(factory);
-        await provider.putDocument({ key: 'keep', schemaVersion: 1, updatedAt: '', data: { keep: true } });
-        await provider.putDocument({ key: 'remove', schemaVersion: 1, updatedAt: '', data: { remove: true } });
+        await provider.putDocument({
+          key: 'keep',
+          schemaVersion: 1,
+          updatedAt: '',
+          data: { keep: true },
+        });
+        await provider.putDocument({
+          key: 'remove',
+          schemaVersion: 1,
+          updatedAt: '',
+          data: { remove: true },
+        });
         await provider.deleteDocument('remove');
         expect(await provider.getDocument('keep')).not.toBeNull();
         expect(await provider.getDocument('remove')).toBeNull();
@@ -418,21 +459,41 @@ export function describeProviderContract(
     describe('Revision Updates', () => {
       it('first putDocument() produces an envelope with a revision', async () => {
         const provider = await connectedProvider(factory);
-        const doc = await provider.putDocument({ key: 'rev', schemaVersion: 1, updatedAt: '', data: {} });
+        const doc = await provider.putDocument({
+          key: 'rev',
+          schemaVersion: 1,
+          updatedAt: '',
+          data: {},
+        });
         expect(doc.revision).toBeDefined();
         expect(typeof doc.revision).toBe('string');
       });
 
       it('subsequent putDocument() for the same key produces a different revision', async () => {
         const provider = await connectedProvider(factory);
-        const first = await provider.putDocument({ key: 'rev-change', schemaVersion: 1, updatedAt: '', data: {} });
-        const second = await provider.putDocument({ key: 'rev-change', schemaVersion: 1, updatedAt: '', data: {} });
+        const first = await provider.putDocument({
+          key: 'rev-change',
+          schemaVersion: 1,
+          updatedAt: '',
+          data: {},
+        });
+        const second = await provider.putDocument({
+          key: 'rev-change',
+          schemaVersion: 1,
+          updatedAt: '',
+          data: {},
+        });
         expect(first.revision).not.toBe(second.revision);
       });
 
       it('revision is stable — reading the same document twice returns the same revision', async () => {
         const provider = await connectedProvider(factory);
-        await provider.putDocument({ key: 'stable-rev', schemaVersion: 1, updatedAt: '', data: {} });
+        await provider.putDocument({
+          key: 'stable-rev',
+          schemaVersion: 1,
+          updatedAt: '',
+          data: {},
+        });
         const r1 = await provider.getDocument('stable-rev');
         const r2 = await provider.getDocument('stable-rev');
         expect(r1!.revision).toBe(r2!.revision);
@@ -440,9 +501,14 @@ export function describeProviderContract(
 
       it('revision is reflected in listDocuments() summaries', async () => {
         const provider = await connectedProvider(factory);
-        const doc = await provider.putDocument({ key: 'list-rev', schemaVersion: 1, updatedAt: '', data: {} });
+        const doc = await provider.putDocument({
+          key: 'list-rev',
+          schemaVersion: 1,
+          updatedAt: '',
+          data: {},
+        });
         const list = await provider.listDocuments();
-        const found = list.find(s => s.key === 'list-rev');
+        const found = list.find((s) => s.key === 'list-rev');
         expect(found).toBeDefined();
         expect(found!.revision).toBe(doc.revision);
       });
@@ -451,7 +517,12 @@ export function describeProviderContract(
     describe('Conflict/Optimistic Concurrency (expectedRevision)', () => {
       it('putDocument() with a matching expectedRevision succeeds', async () => {
         const provider = await connectedProvider(factory);
-        const doc = await provider.putDocument({ key: 'conflict', schemaVersion: 1, updatedAt: '', data: {} });
+        const doc = await provider.putDocument({
+          key: 'conflict',
+          schemaVersion: 1,
+          updatedAt: '',
+          data: {},
+        });
         const updated = await provider.putDocument(
           { key: 'conflict', schemaVersion: 1, updatedAt: '', data: { v: 2 } },
           { expectedRevision: doc.revision },
@@ -473,9 +544,12 @@ export function describeProviderContract(
       it('putDocument() without expectedRevision always succeeds', async () => {
         const provider = await connectedProvider(factory);
         await provider.putDocument({ key: 'free', schemaVersion: 1, updatedAt: '', data: {} });
-        const updated = await provider.putDocument(
-          { key: 'free', schemaVersion: 1, updatedAt: '', data: { v: 2 } },
-        );
+        const updated = await provider.putDocument({
+          key: 'free',
+          schemaVersion: 1,
+          updatedAt: '',
+          data: { v: 2 },
+        });
         expect(updated.data).toEqual({ v: 2 });
       });
     });
@@ -503,7 +577,12 @@ export function describeProviderContract(
         name: 'putDocument() with force overwrites despite a stale expectedRevision',
         body: async () => {
           const provider = await connectedProvider(factory);
-          await provider.putDocument({ key: 'force-over', schemaVersion: 1, updatedAt: '', data: { v: 1 } });
+          await provider.putDocument({
+            key: 'force-over',
+            schemaVersion: 1,
+            updatedAt: '',
+            data: { v: 1 },
+          });
 
           const forced = await provider.putDocument(
             { key: 'force-over', schemaVersion: 1, updatedAt: '', data: { v: 2 } },
@@ -546,7 +625,12 @@ export function describeProviderContract(
         name: 'every observed rejection is a SettingsStoreError carrying a code',
         body: async () => {
           const provider = await connectedProvider(factory);
-          await provider.putDocument({ key: 'taxonomy', schemaVersion: 1, updatedAt: '', data: { v: 1 } });
+          await provider.putDocument({
+            key: 'taxonomy',
+            schemaVersion: 1,
+            updatedAt: '',
+            data: { v: 1 },
+          });
 
           const staleConflict = await captureRejection(
             provider.putDocument(
@@ -581,7 +665,12 @@ export function describeProviderContract(
         const expected = new Map<string, string>();
         for (let i = 0; i < size; i += 1) {
           const key = `page-doc-${String(i).padStart(2, '0')}`;
-          const doc = await provider.putDocument({ key, schemaVersion: 1, updatedAt: '', data: { i } });
+          const doc = await provider.putDocument({
+            key,
+            schemaVersion: 1,
+            updatedAt: '',
+            data: { i },
+          });
           expected.set(key, doc.revision as string);
         }
         return expected;
@@ -596,7 +685,7 @@ export function describeProviderContract(
         summaries: Array<{ key: string; revision?: string }>,
         expected: Map<string, string>,
       ): void {
-        const listed = new Map(summaries.map(summary => [summary.key, summary.revision]));
+        const listed = new Map(summaries.map((summary) => [summary.key, summary.revision]));
         expect([...listed.keys()].sort()).toEqual([...expected.keys()].sort());
         for (const [key, revision] of expected) {
           expect(listed.get(key)).toBe(revision);
@@ -638,10 +727,17 @@ export function describeProviderContract(
         name: 'getDocument() on a 5xx response surfaces a SettingsStoreError, never silent null',
         body: async () => {
           const provider = await connectedProvider(factory);
-          await provider.putDocument({ key: 'server-error-read', schemaVersion: 1, updatedAt: '', data: { v: 1 } });
+          await provider.putDocument({
+            key: 'server-error-read',
+            schemaVersion: 1,
+            updatedAt: '',
+            data: { v: 1 },
+          });
 
           await hooks.runWithServerError!(async () => {
-            await expect(provider.getDocument('server-error-read')).rejects.toThrow(SettingsStoreError);
+            await expect(provider.getDocument('server-error-read')).rejects.toThrow(
+              SettingsStoreError,
+            );
           });
         },
       });
@@ -651,11 +747,21 @@ export function describeProviderContract(
         name: 'putDocument() on a 5xx response surfaces a SettingsStoreError',
         body: async () => {
           const provider = await connectedProvider(factory);
-          await provider.putDocument({ key: 'server-error-write', schemaVersion: 1, updatedAt: '', data: { v: 1 } });
+          await provider.putDocument({
+            key: 'server-error-write',
+            schemaVersion: 1,
+            updatedAt: '',
+            data: { v: 1 },
+          });
 
           await hooks.runWithServerError!(async () => {
             await expect(
-              provider.putDocument({ key: 'server-error-write', schemaVersion: 1, updatedAt: '', data: { v: 2 } }),
+              provider.putDocument({
+                key: 'server-error-write',
+                schemaVersion: 1,
+                updatedAt: '',
+                data: { v: 2 },
+              }),
             ).rejects.toThrow(SettingsStoreError);
           });
         },

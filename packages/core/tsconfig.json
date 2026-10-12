@@ -3,7 +3,6 @@
   "compilerOptions": {
     "outDir": "dist",
     "rootDir": "src",
-    "declaration": true,
     "paths": {
       "@storage-bridge/testing": ["../testing/dist/index.d.ts"],
       "@storage-bridge/core": ["./src/index.ts"]

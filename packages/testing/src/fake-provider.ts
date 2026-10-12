@@ -51,7 +51,10 @@ export class FakeDocumentStoreProvider implements DocumentStoreProvider {
     return entry as SettingsEnvelope<T>;
   }
 
-  async putDocument<T>(doc: SettingsEnvelope<T>, options?: PutOptions): Promise<SettingsEnvelope<T>> {
+  async putDocument<T>(
+    doc: SettingsEnvelope<T>,
+    options?: PutOptions,
+  ): Promise<SettingsEnvelope<T>> {
     this.ensureConnected();
     const existing = this.store.get(doc.key);
 
@@ -84,7 +87,7 @@ export class FakeDocumentStoreProvider implements DocumentStoreProvider {
 
   async listDocuments(): Promise<SettingsSummary[]> {
     this.ensureConnected();
-    return Array.from(this.store.values()).map(entry => ({
+    return Array.from(this.store.values()).map((entry) => ({
       key: entry.key,
       updatedAt: entry.updatedAt,
       revision: entry.revision,

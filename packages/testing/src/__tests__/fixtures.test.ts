@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { createSettingsEnvelope, createSettingsSummary, createConnectedProfile } from '../fixtures.js';
+import {
+  createSettingsEnvelope,
+  createSettingsSummary,
+  createConnectedProfile,
+} from '../fixtures.js';
 
 describe('createSettingsEnvelope', () => {
   it('returns an envelope with default values', () => {

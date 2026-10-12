@@ -7,7 +7,7 @@ vi.mock('expo-auth-session', () => {
     AuthRequest: class {
       codeVerifier = 'mock-verifier';
       promptAsync = vi.fn();
-    }
+    },
   };
 });
 

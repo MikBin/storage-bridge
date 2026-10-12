@@ -20,9 +20,7 @@ export function createSettingsEnvelope<T = Record<string, unknown>>(
  * Create a SettingsSummary with sensible defaults and optional overrides.
  * Default: key='test-key', updatedAt=now, no revision
  */
-export function createSettingsSummary(
-  overrides: Partial<SettingsSummary> = {},
-): SettingsSummary {
+export function createSettingsSummary(overrides: Partial<SettingsSummary> = {}): SettingsSummary {
   return {
     key: 'test-key',
     updatedAt: new Date().toISOString(),

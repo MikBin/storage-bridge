@@ -20,9 +20,11 @@ const DIRECT_CONSTRUCTION_MESSAGE =
 
 function isViableSecureStore(candidate: unknown): candidate is SecureStoreModule {
   const secureStore = candidate as Partial<SecureStoreModule> | null;
-  return typeof secureStore?.getItemAsync === 'function'
-    && typeof secureStore?.setItemAsync === 'function'
-    && typeof secureStore?.deleteItemAsync === 'function';
+  return (
+    typeof secureStore?.getItemAsync === 'function' &&
+    typeof secureStore?.setItemAsync === 'function' &&
+    typeof secureStore?.deleteItemAsync === 'function'
+  );
 }
 
 /**
@@ -81,7 +83,7 @@ export class ReactNativeOAuthClient implements OAuthClient {
    * an actionable message — never a silent plaintext fallback.
    */
   static async create(options: ReactNativeOAuthClientOptions): Promise<ReactNativeOAuthClient> {
-    const tokenStore = options.tokenStore ?? await createDefaultTokenStore();
+    const tokenStore = options.tokenStore ?? (await createDefaultTokenStore());
     return new ReactNativeOAuthClient({ ...options, tokenStore });
   }
 

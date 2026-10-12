@@ -13,18 +13,27 @@ function createCloudKitGlobalFake() {
   const configure = vi.fn();
   const setUpAuth = vi.fn(async () => ({ user: { recordName: '_id-1' } }));
   const db = {
-    fetchRecordWithName: vi.fn(
-      async () => ({ recordName: 'doc1', recordType: 'SettingsDocument', fields: { payload: { value: '{}' } } }),
-    ),
+    fetchRecordWithName: vi.fn(async () => ({
+      recordName: 'doc1',
+      recordType: 'SettingsDocument',
+      fields: { payload: { value: '{}' } },
+    })),
     saveRecords: vi.fn(async (records: unknown[]) => ({ records: [records[0]] })),
     deleteRecordWithName: vi.fn(async (recordName: string) => ({ recordName, deleted: true })),
     performQuery: vi.fn(
-      async (_query: unknown, _options?: unknown): Promise<{ records?: unknown[]; continuationMarker?: string }> => ({
+      async (
+        _query: unknown,
+        _options?: unknown,
+      ): Promise<{ records?: unknown[]; continuationMarker?: string }> => ({
         records: [],
       }),
     ),
   };
-  const container = { containerIdentifier: 'iCloud.com.test.container', setUpAuth, privateCloudDatabase: db };
+  const container = {
+    containerIdentifier: 'iCloud.com.test.container',
+    setUpAuth,
+    privateCloudDatabase: db,
+  };
   const CloudKit = { configure, getDefaultContainer: vi.fn(() => container) };
   return { CloudKit, configure, setUpAuth, container, db };
 }
@@ -46,7 +55,10 @@ describe('CloudKitJsClient (CloudKit JS adapter, D3)', () => {
 
   async function setUpClient(): Promise<CloudKitJsClient> {
     const client = createClient();
-    await client.setUp({ containerIdentifier: 'iCloud.com.test.container', environment: 'development' });
+    await client.setUp({
+      containerIdentifier: 'iCloud.com.test.container',
+      environment: 'development',
+    });
     return client;
   }
 
@@ -62,7 +74,10 @@ describe('CloudKitJsClient (CloudKit JS adapter, D3)', () => {
   describe('setUp — Apple web sign-in', () => {
     it('configures CloudKit JS with the api token, container identifier and environment', async () => {
       const client = createClient();
-      await client.setUp({ containerIdentifier: 'iCloud.com.test.container', environment: 'development' });
+      await client.setUp({
+        containerIdentifier: 'iCloud.com.test.container',
+        environment: 'development',
+      });
 
       expect(fake.configure).toHaveBeenCalledTimes(1);
       expect(fake.configure.mock.calls[0][0]).toEqual({
@@ -80,7 +95,9 @@ describe('CloudKitJsClient (CloudKit JS adapter, D3)', () => {
     it('maps an auth failure during sign-in to AuthRequiredError', async () => {
       fake.setUpAuth.mockRejectedValue(rawError('auth failed', { httpStatus: 401 }));
       const client = createClient();
-      await expect(client.setUp({ containerIdentifier: 'iCloud.com.test.container' })).rejects.toThrow(AuthRequiredError);
+      await expect(
+        client.setUp({ containerIdentifier: 'iCloud.com.test.container' }),
+      ).rejects.toThrow(AuthRequiredError);
     });
 
     it('rejects with an actionable error when the CloudKit JS global is absent', async () => {
@@ -128,7 +145,9 @@ describe('CloudKitJsClient (CloudKit JS adapter, D3)', () => {
     });
 
     it('returns null when the record is missing (NOT_FOUND folds to null)', async () => {
-      fake.db.fetchRecordWithName.mockRejectedValue(rawError('missing', { serverErrorCode: 'NOT_FOUND' }));
+      fake.db.fetchRecordWithName.mockRejectedValue(
+        rawError('missing', { serverErrorCode: 'NOT_FOUND' }),
+      );
       const client = await setUpClient();
       await expect(client.fetchRecord('ghost', 'SettingsDocument')).resolves.toBeNull();
     });
@@ -138,13 +157,23 @@ describe('CloudKitJsClient (CloudKit JS adapter, D3)', () => {
       const authFailures = [
         { label: 'HTTP 401', httpStatus: 401, serverErrorCode: undefined },
         { label: 'HTTP 403', httpStatus: 403, serverErrorCode: undefined },
-        { label: 'in-band AUTHENTICATION_REQUIRED', httpStatus: undefined, serverErrorCode: 'AUTHENTICATION_REQUIRED' },
-        { label: 'in-band AUTHENTICATE_REQUIRED', httpStatus: undefined, serverErrorCode: 'AUTHENTICATE_REQUIRED' },
+        {
+          label: 'in-band AUTHENTICATION_REQUIRED',
+          httpStatus: undefined,
+          serverErrorCode: 'AUTHENTICATION_REQUIRED',
+        },
+        {
+          label: 'in-band AUTHENTICATE_REQUIRED',
+          httpStatus: undefined,
+          serverErrorCode: 'AUTHENTICATE_REQUIRED',
+        },
       ];
       const client = await setUpClient();
       for (const failure of authFailures) {
         fake.db.fetchRecordWithName.mockRejectedValue(rawError('auth', failure));
-        await expect(client.fetchRecord('doc1', 'SettingsDocument'), failure.label).rejects.toThrow(AuthRequiredError);
+        await expect(client.fetchRecord('doc1', 'SettingsDocument'), failure.label).rejects.toThrow(
+          AuthRequiredError,
+        );
       }
     });
 
@@ -165,7 +194,9 @@ describe('CloudKitJsClient (CloudKit JS adapter, D3)', () => {
 
     it('rejects with a coded error when used before setUp', async () => {
       const client = createClient();
-      await expect(client.fetchRecord('doc1', 'SettingsDocument')).rejects.toThrow(SettingsStoreError);
+      await expect(client.fetchRecord('doc1', 'SettingsDocument')).rejects.toThrow(
+        SettingsStoreError,
+      );
     });
   });
 
@@ -223,7 +254,9 @@ describe('CloudKitJsClient (CloudKit JS adapter, D3)', () => {
     });
 
     it('is idempotent when the record is missing (NOT_FOUND)', async () => {
-      fake.db.deleteRecordWithName.mockRejectedValue(rawError('missing', { serverErrorCode: 'NOT_FOUND' }));
+      fake.db.deleteRecordWithName.mockRejectedValue(
+        rawError('missing', { serverErrorCode: 'NOT_FOUND' }),
+      );
       const client = await setUpClient();
       await expect(client.deleteRecord('ghost', 'SettingsDocument')).resolves.toBeUndefined();
     });
@@ -245,8 +278,16 @@ describe('CloudKitJsClient (CloudKit JS adapter, D3)', () => {
 
   describe('queryRecords — 02-03 continuation shape preserved', () => {
     it('aggregates every page, following continuationMarker until exhausted', async () => {
-      const page1 = { recordName: 'r1', recordType: 'SettingsDocument', fields: { payload: { value: '{}' } } };
-      const page2 = { recordName: 'r2', recordType: 'SettingsDocument', fields: { payload: { value: '{}' } } };
+      const page1 = {
+        recordName: 'r1',
+        recordType: 'SettingsDocument',
+        fields: { payload: { value: '{}' } },
+      };
+      const page2 = {
+        recordName: 'r2',
+        recordType: 'SettingsDocument',
+        fields: { payload: { value: '{}' } },
+      };
       fake.db.performQuery
         .mockResolvedValueOnce({ records: [page1], continuationMarker: 'continuation-1' })
         .mockResolvedValueOnce({ records: [page2] });
@@ -254,11 +295,13 @@ describe('CloudKitJsClient (CloudKit JS adapter, D3)', () => {
       const client = await setUpClient();
       const records = await client.queryRecords('SettingsDocument');
 
-      expect(records.map(r => r.recordName)).toEqual(['r1', 'r2']);
+      expect(records.map((r) => r.recordName)).toEqual(['r1', 'r2']);
       expect(fake.db.performQuery).toHaveBeenCalledTimes(2);
       expect(fake.db.performQuery.mock.calls[0][0]).toEqual({ recordType: 'SettingsDocument' });
       expect(fake.db.performQuery.mock.calls[1][0]).toEqual({ recordType: 'SettingsDocument' });
-      expect(fake.db.performQuery.mock.calls[1][1]).toEqual({ continuationMarker: 'continuation-1' });
+      expect(fake.db.performQuery.mock.calls[1][1]).toEqual({
+        continuationMarker: 'continuation-1',
+      });
     });
   });
 });

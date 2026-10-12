@@ -209,7 +209,11 @@ describe('TokenManager (03-03 shared token lifecycle)', () => {
         expect(body.get('refresh_token')).toBe('stored-refresh');
         expect(body.get('client_id')).toBe('test-client-id');
 
-        expect(snapshot(store)).toEqual({ access: 'new-access', refresh: 'new-refresh', expiry: NOW + 1_800_000 });
+        expect(snapshot(store)).toEqual({
+          access: 'new-access',
+          refresh: 'new-refresh',
+          expiry: NOW + 1_800_000,
+        });
       });
 
       it('expiry boundary: exactly at the 60s buffer is still fresh, 1ms inside triggers refresh', async () => {
@@ -244,7 +248,11 @@ describe('TokenManager (03-03 shared token lifecycle)', () => {
 
         await expect(manager.getAccessToken()).rejects.toThrow(AuthRequiredError);
 
-        expect(snapshot(store)).toEqual({ access: undefined, refresh: undefined, expiry: undefined });
+        expect(snapshot(store)).toEqual({
+          access: undefined,
+          refresh: undefined,
+          expiry: undefined,
+        });
       });
 
       it('network failure: AuthExchangeError chaining the cause, grant preserved', async () => {
@@ -256,19 +264,30 @@ describe('TokenManager (03-03 shared token lifecycle)', () => {
 
         expect(error).toBeInstanceOf(AuthExchangeError);
         expect((error as { cause?: unknown }).cause).toBe(NETWORK_ERROR);
-        expect(snapshot(store)).toEqual({ access: 'stored-access', refresh: 'stored-refresh', expiry: NOW + 30_000 });
+        expect(snapshot(store)).toEqual({
+          access: 'stored-access',
+          refresh: 'stored-refresh',
+          expiry: NOW + 30_000,
+        });
       });
 
-      it.each(SERVER_FAILURE_STATUSES)('HTTP %i: AuthExchangeError, grant preserved', async (status) => {
-        const { manager, store, fetchFn } = makeManager({ asyncBacked });
-        await store.set(PROVIDER_ID, nearExpiryTokens());
-        fetchFn.mockResolvedValueOnce(tokenEndpointFailure(status));
+      it.each(SERVER_FAILURE_STATUSES)(
+        'HTTP %i: AuthExchangeError, grant preserved',
+        async (status) => {
+          const { manager, store, fetchFn } = makeManager({ asyncBacked });
+          await store.set(PROVIDER_ID, nearExpiryTokens());
+          fetchFn.mockResolvedValueOnce(tokenEndpointFailure(status));
 
-        const error = await captureRejection(manager.getAccessToken());
+          const error = await captureRejection(manager.getAccessToken());
 
-        expect(error).toBeInstanceOf(AuthExchangeError);
-        expect(snapshot(store)).toEqual({ access: 'stored-access', refresh: 'stored-refresh', expiry: NOW + 30_000 });
-      });
+          expect(error).toBeInstanceOf(AuthExchangeError);
+          expect(snapshot(store)).toEqual({
+            access: 'stored-access',
+            refresh: 'stored-refresh',
+            expiry: NOW + 30_000,
+          });
+        },
+      );
 
       it('HTTP 500 cause message carries the status and body excerpt', async () => {
         const { manager, store, fetchFn } = makeManager({ asyncBacked });
@@ -283,19 +302,30 @@ describe('TokenManager (03-03 shared token lifecycle)', () => {
         const causeMessage = String((error as { cause?: { message?: string } }).cause?.message);
         expect(causeMessage).toContain('500');
         expect(causeMessage).toContain('upstream down');
-        expect(snapshot(store)).toEqual({ access: 'stored-access', refresh: 'stored-refresh', expiry: NOW + 30_000 });
+        expect(snapshot(store)).toEqual({
+          access: 'stored-access',
+          refresh: 'stored-refresh',
+          expiry: NOW + 30_000,
+        });
       });
 
-      it.each(AUTH_REJECTION_STATUSES)('HTTP %i: AuthRequiredError and the stored grant is cleared', async (status) => {
-        const { manager, store, fetchFn } = makeManager({ asyncBacked });
-        await store.set(PROVIDER_ID, nearExpiryTokens());
-        fetchFn.mockResolvedValueOnce(tokenEndpointFailure(status));
+      it.each(AUTH_REJECTION_STATUSES)(
+        'HTTP %i: AuthRequiredError and the stored grant is cleared',
+        async (status) => {
+          const { manager, store, fetchFn } = makeManager({ asyncBacked });
+          await store.set(PROVIDER_ID, nearExpiryTokens());
+          fetchFn.mockResolvedValueOnce(tokenEndpointFailure(status));
 
-        const error = await captureRejection(manager.getAccessToken());
+          const error = await captureRejection(manager.getAccessToken());
 
-        expect(error).toBeInstanceOf(AuthRequiredError);
-        expect(snapshot(store)).toEqual({ access: undefined, refresh: undefined, expiry: undefined });
-      });
+          expect(error).toBeInstanceOf(AuthRequiredError);
+          expect(snapshot(store)).toEqual({
+            access: undefined,
+            refresh: undefined,
+            expiry: undefined,
+          });
+        },
+      );
     });
 
     describe('single-flight refresh (03-04)', () => {
@@ -313,11 +343,17 @@ describe('TokenManager (03-03 shared token lifecycle)', () => {
           await store.set(PROVIDER_ID, nearExpiryTokens());
           fetchFn.mockResolvedValue(tokenEndpointSuccess());
 
-          const results = await Promise.all(Array.from({ length: n }, () => manager.getAccessToken()));
+          const results = await Promise.all(
+            Array.from({ length: n }, () => manager.getAccessToken()),
+          );
 
           expect(fetchFn).toHaveBeenCalledTimes(1);
           expect(new Set(results)).toEqual(new Set(['new-access']));
-          expect(snapshot(store)).toEqual({ access: 'new-access', refresh: 'new-refresh', expiry: NOW + 1_800_000 });
+          expect(snapshot(store)).toEqual({
+            access: 'new-access',
+            refresh: 'new-refresh',
+            expiry: NOW + 1_800_000,
+          });
         },
       );
 
@@ -329,7 +365,9 @@ describe('TokenManager (03-03 shared token lifecycle)', () => {
           const removeSpy = vi.spyOn(store, 'remove');
           fetchFn.mockResolvedValue(tokenEndpointFailure(400));
 
-          const outcomes = await Promise.allSettled(Array.from({ length: n }, () => manager.getAccessToken()));
+          const outcomes = await Promise.allSettled(
+            Array.from({ length: n }, () => manager.getAccessToken()),
+          );
 
           for (const outcome of outcomes) {
             expect(outcome.status).toBe('rejected');
@@ -337,7 +375,11 @@ describe('TokenManager (03-03 shared token lifecycle)', () => {
           }
           expect(fetchFn).toHaveBeenCalledTimes(1);
           expect(removeSpy).toHaveBeenCalledTimes(1);
-          expect(snapshot(store)).toEqual({ access: undefined, refresh: undefined, expiry: undefined });
+          expect(snapshot(store)).toEqual({
+            access: undefined,
+            refresh: undefined,
+            expiry: undefined,
+          });
         },
       );
 
@@ -348,14 +390,20 @@ describe('TokenManager (03-03 shared token lifecycle)', () => {
           await store.set(PROVIDER_ID, nearExpiryTokens());
           fetchFn.mockResolvedValue(tokenEndpointFailure(500));
 
-          const outcomes = await Promise.allSettled(Array.from({ length: n }, () => manager.getAccessToken()));
+          const outcomes = await Promise.allSettled(
+            Array.from({ length: n }, () => manager.getAccessToken()),
+          );
 
           for (const outcome of outcomes) {
             expect(outcome.status).toBe('rejected');
             expect((outcome as PromiseRejectedResult).reason).toBeInstanceOf(AuthExchangeError);
           }
           expect(fetchFn).toHaveBeenCalledTimes(1);
-          expect(snapshot(store)).toEqual({ access: 'stored-access', refresh: 'stored-refresh', expiry: NOW + 30_000 });
+          expect(snapshot(store)).toEqual({
+            access: 'stored-access',
+            refresh: 'stored-refresh',
+            expiry: NOW + 30_000,
+          });
         },
       );
 
@@ -368,7 +416,11 @@ describe('TokenManager (03-03 shared token lifecycle)', () => {
         await expect(manager.getAccessToken()).resolves.toBe('new-access');
 
         expect(fetchFn).toHaveBeenCalledTimes(1);
-        expect(snapshot(store)).toEqual({ access: 'new-access', refresh: 'new-refresh', expiry: NOW + 1_800_000 });
+        expect(snapshot(store)).toEqual({
+          access: 'new-access',
+          refresh: 'new-refresh',
+          expiry: NOW + 1_800_000,
+        });
       });
     });
 
@@ -380,7 +432,11 @@ describe('TokenManager (03-03 shared token lifecycle)', () => {
 
         await expect(manager.getAccessToken()).resolves.toBe('new-access');
 
-        expect(snapshot(store)).toEqual({ access: 'new-access', refresh: 'stored-refresh', expiry: NOW + 1_800_000 });
+        expect(snapshot(store)).toEqual({
+          access: 'new-access',
+          refresh: 'stored-refresh',
+          expiry: NOW + 1_800_000,
+        });
       });
 
       it('defaults the persisted token type to Bearer when the response omits it', async () => {
@@ -398,12 +454,19 @@ describe('TokenManager (03-03 shared token lifecycle)', () => {
       it('posts the authorization_code grant and persists the exchanged tokens', async () => {
         const { manager, store, fetchFn } = makeManager({ asyncBacked });
         fetchFn.mockResolvedValueOnce(
-          tokenEndpointSuccess({ access_token: 'code-access', refresh_token: 'code-refresh', expires_in: 600 }),
+          tokenEndpointSuccess({
+            access_token: 'code-access',
+            refresh_token: 'code-refresh',
+            expires_in: 600,
+          }),
         );
 
         const exchanged = await manager.exchangeAuthorizationCode('auth-code', 'verifier-123');
 
-        expect(exchanged).toMatchObject({ accessToken: 'code-access', refreshToken: 'code-refresh' });
+        expect(exchanged).toMatchObject({
+          accessToken: 'code-access',
+          refreshToken: 'code-refresh',
+        });
         expect(fetchFn).toHaveBeenCalledTimes(1);
         const [url, init] = fetchFn.mock.calls[0];
         expect(url).toBe(CONFIG.tokenEndpoint);
@@ -414,7 +477,11 @@ describe('TokenManager (03-03 shared token lifecycle)', () => {
         expect(body.get('code_verifier')).toBe('verifier-123');
         expect(body.get('redirect_uri')).toBe(CONFIG.redirectUri);
         expect(body.get('client_id')).toBe(CONFIG.clientId);
-        expect(snapshot(store)).toEqual({ access: 'code-access', refresh: 'code-refresh', expiry: NOW + 600_000 });
+        expect(snapshot(store)).toEqual({
+          access: 'code-access',
+          refresh: 'code-refresh',
+          expiry: NOW + 600_000,
+        });
       });
 
       it('omits code_verifier when none is provided (optional PKCE)', async () => {
@@ -431,9 +498,17 @@ describe('TokenManager (03-03 shared token lifecycle)', () => {
         const { manager, store, fetchFn } = makeManager({ asyncBacked });
         await store.set(
           PROVIDER_ID,
-          tokens({ accessToken: 'prior-access', refreshToken: 'prior-refresh', expiresAt: NOW + 5_000 }),
+          tokens({
+            accessToken: 'prior-access',
+            refreshToken: 'prior-refresh',
+            expiresAt: NOW + 5_000,
+          }),
         );
-        const priorState: TokenStateSnapshot = { access: 'prior-access', refresh: 'prior-refresh', expiry: NOW + 5_000 };
+        const priorState: TokenStateSnapshot = {
+          access: 'prior-access',
+          refresh: 'prior-refresh',
+          expiry: NOW + 5_000,
+        };
 
         fetchFn.mockRejectedValueOnce(NETWORK_ERROR);
         const networkError = await captureRejection(manager.exchangeAuthorizationCode('code'));
@@ -456,7 +531,9 @@ describe('TokenManager (03-03 shared token lifecycle)', () => {
         const { manager, store, fetchFn } = makeManager({ asyncBacked });
         await store.set(PROVIDER_ID, tokens());
 
-        await expect(manager.getAuthHeaders()).resolves.toEqual({ Authorization: 'Bearer stored-access' });
+        await expect(manager.getAuthHeaders()).resolves.toEqual({
+          Authorization: 'Bearer stored-access',
+        });
 
         expect(fetchFn).not.toHaveBeenCalled();
       });
@@ -466,9 +543,15 @@ describe('TokenManager (03-03 shared token lifecycle)', () => {
         await store.set(PROVIDER_ID, nearExpiryTokens());
         fetchFn.mockResolvedValueOnce(tokenEndpointSuccess({ access_token: 'header-access' }));
 
-        await expect(manager.getAuthHeaders()).resolves.toEqual({ Authorization: 'Bearer header-access' });
+        await expect(manager.getAuthHeaders()).resolves.toEqual({
+          Authorization: 'Bearer header-access',
+        });
 
-        expect(snapshot(store)).toEqual({ access: 'header-access', refresh: 'new-refresh', expiry: NOW + 1_800_000 });
+        expect(snapshot(store)).toEqual({
+          access: 'header-access',
+          refresh: 'new-refresh',
+          expiry: NOW + 1_800_000,
+        });
       });
 
       it('getTokens() returns the stored grant or null', async () => {
@@ -485,7 +568,11 @@ describe('TokenManager (03-03 shared token lifecycle)', () => {
 
         await manager.logout();
 
-        expect(snapshot(store)).toEqual({ access: undefined, refresh: undefined, expiry: undefined });
+        expect(snapshot(store)).toEqual({
+          access: undefined,
+          refresh: undefined,
+          expiry: undefined,
+        });
         await expect(manager.getAccessToken()).rejects.toThrow(AuthRequiredError);
       });
     });
@@ -500,7 +587,11 @@ describe('TokenManager (03-03 shared token lifecycle)', () => {
 
       await expect(manager.getAccessToken()).resolves.toBe('new-access');
 
-      expect(snapshot(store)).toEqual({ access: 'new-access', refresh: 'new-refresh', expiry: NOW + 5_000 + 120_000 });
+      expect(snapshot(store)).toEqual({
+        access: 'new-access',
+        refresh: 'new-refresh',
+        expiry: NOW + 5_000 + 120_000,
+      });
     });
   });
 
@@ -515,7 +606,12 @@ describe('TokenManager (03-03 shared token lifecycle)', () => {
     // pure validator — the single implementation consumed by both runtimes'
     // completeAuthFlow paths.
     function pending(createdAt: number, providerId: string = PROVIDER_ID): oauth.PendingAuthState {
-      return { providerId: providerId as oauth.PendingAuthState['providerId'], codeVerifier: 'verifier', state: 'state-1', createdAt };
+      return {
+        providerId: providerId as oauth.PendingAuthState['providerId'],
+        codeVerifier: 'verifier',
+        state: 'state-1',
+        createdAt,
+      };
     }
 
     it('accepts a matching provider with an age within the TTL window', () => {
@@ -536,7 +632,9 @@ describe('TokenManager (03-03 shared token lifecycle)', () => {
 
   describe('requireTokenEndpointSuccess (response classifier moved from auth-web)', () => {
     it('resolves on a 200 response', async () => {
-      await expect(oauth.requireTokenEndpointSuccess(tokenEndpointSuccess(), PROVIDER_ID)).resolves.toBeUndefined();
+      await expect(
+        oauth.requireTokenEndpointSuccess(tokenEndpointSuccess(), PROVIDER_ID),
+      ).resolves.toBeUndefined();
     });
 
     it.each(AUTH_REJECTION_STATUSES)('HTTP %i throws AuthRequiredError', async (status) => {
@@ -546,15 +644,21 @@ describe('TokenManager (03-03 shared token lifecycle)', () => {
       expect(error).toBeInstanceOf(AuthRequiredError);
     });
 
-    it.each(SERVER_FAILURE_STATUSES)('HTTP %i throws AuthExchangeError with status and excerpt', async (status) => {
-      const error = await captureRejection(
-        oauth.requireTokenEndpointSuccess(tokenEndpointFailure(status, '{"error":"upstream"}'), PROVIDER_ID),
-      );
-      expect(error).toBeInstanceOf(AuthExchangeError);
-      const causeMessage = String((error as { cause?: { message?: string } }).cause?.message);
-      expect(causeMessage).toContain(String(status));
-      expect(causeMessage).toContain('upstream');
-    });
+    it.each(SERVER_FAILURE_STATUSES)(
+      'HTTP %i throws AuthExchangeError with status and excerpt',
+      async (status) => {
+        const error = await captureRejection(
+          oauth.requireTokenEndpointSuccess(
+            tokenEndpointFailure(status, '{"error":"upstream"}'),
+            PROVIDER_ID,
+          ),
+        );
+        expect(error).toBeInstanceOf(AuthExchangeError);
+        const causeMessage = String((error as { cause?: { message?: string } }).cause?.message);
+        expect(causeMessage).toContain(String(status));
+        expect(causeMessage).toContain('upstream');
+      },
+    );
 
     it('appends a placeholder when the failure body cannot be read', async () => {
       const response = {
@@ -565,7 +669,9 @@ describe('TokenManager (03-03 shared token lifecycle)', () => {
         },
       } as unknown as Response;
 
-      const error = await captureRejection(oauth.requireTokenEndpointSuccess(response, PROVIDER_ID));
+      const error = await captureRejection(
+        oauth.requireTokenEndpointSuccess(response, PROVIDER_ID),
+      );
 
       expect(error).toBeInstanceOf(AuthExchangeError);
       const causeMessage = String((error as { cause?: { message?: string } }).cause?.message);

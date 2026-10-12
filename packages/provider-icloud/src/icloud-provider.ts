@@ -119,7 +119,7 @@ export class ICloudProvider extends RecordBackedDocumentProvider {
   protected async listRecords(): Promise<CloudRecord[]> {
     try {
       const raws = await this.client.queryRecords(this.recordType);
-      return raws.filter(r => !r.deleted).map(mapToCloudRecord);
+      return raws.filter((r) => !r.deleted).map(mapToCloudRecord);
     } catch (error) {
       throw mapCloudKitError(error, 'ICLOUD_REQUEST_ERROR');
     }

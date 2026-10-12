@@ -17,13 +17,13 @@ Apps shouldn't need their own backend just to persist user preferences. Storage 
 
 ## Supported Providers
 
-| Provider | Storage Model | Scope |
-|----------|--------------|-------|
-| Google Drive | `appDataFolder` | App-only |
-| Dropbox | App Folder | App-only |
-| OneDrive | `/special/approot` | App-only |
-| iCloud | CloudKit private database | Per-user |
-| Local | In-memory / localStorage | Fallback |
+| Provider     | Storage Model             | Scope    |
+| ------------ | ------------------------- | -------- |
+| Google Drive | `appDataFolder`           | App-only |
+| Dropbox      | App Folder                | App-only |
+| OneDrive     | `/special/approot`        | App-only |
+| iCloud       | CloudKit private database | Per-user |
+| Local        | In-memory / localStorage  | Fallback |
 
 ## Quick Example
 

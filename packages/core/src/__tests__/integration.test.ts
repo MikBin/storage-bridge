@@ -42,7 +42,7 @@ class FakeIntegrationProvider implements DocumentStoreProvider {
 
   async putDocument<T>(
     doc: SettingsEnvelope<T>,
-    options?: PutOptions
+    options?: PutOptions,
   ): Promise<SettingsEnvelope<T>> {
     const existing = this.documents.get(doc.key);
 
@@ -70,7 +70,7 @@ class FakeIntegrationProvider implements DocumentStoreProvider {
   }
 
   async listDocuments(): Promise<SettingsSummary[]> {
-    return Array.from(this.documents.values()).map(doc => ({
+    return Array.from(this.documents.values()).map((doc) => ({
       key: doc.key,
       updatedAt: doc.updatedAt,
       revision: doc.revision,
@@ -145,12 +145,12 @@ describe('Core Integration Tests', () => {
 
     // Put with incorrect expectedRevision
     await expect(
-      store.put('concurrent-doc', { step: 3 }, { expectedRevision: 'rev-1' })
+      store.put('concurrent-doc', { step: 3 }, { expectedRevision: 'rev-1' }),
     ).rejects.toThrow(ConflictError);
 
     // Put for a new doc with an expectedRevision should also fail
     await expect(
-      store.put('new-doc', { step: 1 }, { expectedRevision: 'rev-anything' })
+      store.put('new-doc', { step: 1 }, { expectedRevision: 'rev-anything' }),
     ).rejects.toThrow(ConflictError);
   });
 
@@ -168,7 +168,7 @@ describe('Core Integration Tests', () => {
       key: 'schema-doc',
       schemaVersion: 3,
       updatedAt: new Date().toISOString(),
-      data: { text: 'v3' }
+      data: { text: 'v3' },
     });
 
     // Now get the document, it should have schemaVersion 3

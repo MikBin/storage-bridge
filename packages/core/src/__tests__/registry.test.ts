@@ -15,7 +15,7 @@ describe('ProviderRegistry', () => {
       label: 'Local Storage',
       capabilities: ['web'],
       isSupported: async () => true,
-      create: () => ({} as any),
+      create: () => ({}) as any,
     };
 
     const registry = new ProviderRegistry([mockDescriptor]);
@@ -29,7 +29,7 @@ describe('ProviderRegistry', () => {
       label: 'Local Storage',
       capabilities: ['web'],
       isSupported: async () => true,
-      create: () => ({} as any),
+      create: () => ({}) as any,
     };
 
     const registry = new ProviderRegistry();
@@ -40,12 +40,12 @@ describe('ProviderRegistry', () => {
   });
 
   it('should override existing descriptor if registered with the same id', () => {
-     const mockDescriptor1: ProviderDescriptor = {
+    const mockDescriptor1: ProviderDescriptor = {
       id: 'local',
       label: 'Local Storage 1',
       capabilities: ['web'],
       isSupported: async () => true,
-      create: () => ({} as any),
+      create: () => ({}) as any,
     };
 
     const mockDescriptor2: ProviderDescriptor = {
@@ -53,7 +53,7 @@ describe('ProviderRegistry', () => {
       label: 'Local Storage 2',
       capabilities: ['web'],
       isSupported: async () => true,
-      create: () => ({} as any),
+      create: () => ({}) as any,
     };
 
     const registry = new ProviderRegistry([mockDescriptor1]);
@@ -71,7 +71,7 @@ describe('createSettingsStore', () => {
       label: 'Local Storage',
       capabilities: ['web'],
       isSupported: async () => true,
-      create: () => ({} as any),
+      create: () => ({}) as any,
     };
 
     const store = createSettingsStore([mockDescriptor]);
