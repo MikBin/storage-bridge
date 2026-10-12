@@ -38,6 +38,10 @@ await store.put('preferences', { theme: 'dark', locale: 'en' });
 const prefs = await store.get('preferences');
 ```
 
+## ESM-only
+
+All published `@storage-bridge/*` packages are **pure ES modules**. The `exports` map exposes only `import` and `types` conditions — there is no CommonJS `require`/`default` fallback. This keeps the packages compatible with browsers, bundlers, Node.js 22+, and React Native's Metro (which resolves ESM natively).
+
 ## Architecture
 
 See [settings-store-architecture.md](./docs/settings-store-architecture.md) for the full design — public API, provider port, error model, auth abstraction, and monorepo structure.

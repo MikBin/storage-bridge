@@ -1,14 +1,30 @@
 {
   "name": "@storage-bridge/provider-google-drive",
   "version": "1.0.0",
+  "description": "Google Drive (appDataFolder) storage provider for @storage-bridge",
+  "license": "MIT",
   "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=22"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MikBin/storage-bridge.git",
+    "directory": "packages/provider-google-drive"
+  },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "default": "./dist/index.js"
+      "import": "./dist/index.js"
     }
   },
   "scripts": {

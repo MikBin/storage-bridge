@@ -1,14 +1,30 @@
 {
   "name": "@storage-bridge/auth-web",
   "version": "1.0.0",
+  "description": "Browser OAuth (PKCE) authentication adapters for @storage-bridge",
+  "license": "MIT",
   "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=22"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MikBin/storage-bridge.git",
+    "directory": "packages/auth-web"
+  },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "default": "./dist/index.js"
+      "import": "./dist/index.js"
     }
   },
   "scripts": {

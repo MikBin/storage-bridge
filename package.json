@@ -9,9 +9,13 @@
     "test": "turbo run test",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
-    "dev": "turbo run dev"
+    "dev": "turbo run dev",
+    "release:version": "changeset version",
+    "release:publish": "changeset publish --provenance",
+    "release:status": "changeset status"
   },
   "devDependencies": {
+    "@changesets/cli": "^3.0.3",
     "eslint": "^10.2.0",
     "turbo": "latest",
     "typescript": "latest"

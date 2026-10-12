@@ -9,5 +9,6 @@
       "@storage-bridge/core": ["./src/index.ts"]
     }
   },
-  "include": ["src/**/*"]
+  "include": ["src/**/*"],
+  "exclude": ["src/__tests__"]
 }
