@@ -1,40 +1,46 @@
-import { describeProviderContract } from '@storage-bridge/testing';
+import { describeProviderContract, type ContractFamily } from '@storage-bridge/testing';
 import { OneDriveProvider } from '../onedrive-provider.js';
 import { createOneDriveApiMock } from './onedrive-api-mock.js';
-import type { OAuthClient } from '@storage-bridge/auth-web';
+import type { OAuthClient, OAuthTokens } from '@storage-bridge/auth-web';
+
+/**
+ * Honest harness: the unmodified OneDriveProvider runs the shared suite against
+ * the Graph API mock with a token-stateful auth double. There is no auto-connect
+ * Proxy and no disconnected success fiction — when logged out the auth double
+ * yields empty headers, so the provider observes a real 401. Pending families
+ * declare the post-remediation behavior the provider does not satisfy yet;
+ * activating a family is the acceptance gate of the step that owns it.
+ */
+const PENDING_FAMILIES: readonly ContractFamily[] = [
+  'disconnected-operations', // 02-04: provider performs requests without a connection guard
+  'conflict-payload',        // 02-05: ConflictError carries the encoded filename, no logical-key payload
+];
 
 function createContractProvider(): OneDriveProvider {
   const api = createOneDriveApiMock();
-  let connected = false;
+  api.reset();
+
+  let tokens: OAuthTokens | null = null;
+
   const auth: OAuthClient = {
-    login: async () => { connected = true; },
-    logout: async () => { connected = false; },
-    getAccessToken: async () => connected ? 'test-token' : null as any,
-    getTokens: async () => connected ? ({ accessToken: 'test-token', tokenType: 'Bearer', expiresAt: Date.now() + 3600000 }) : null,
-    getAuthHeaders: async () => ({ Authorization: connected ? 'Bearer test-token' : '' }),
+    login: async () => {
+      tokens = { accessToken: 'test-token', tokenType: 'Bearer', expiresAt: Date.now() + 3600000 };
+    },
+    logout: async () => {
+      tokens = null;
+    },
+    getAccessToken: async () => {
+      if (!tokens) throw new Error('Not authenticated');
+      return tokens.accessToken;
+    },
+    getTokens: async () => tokens,
+    getAuthHeaders: async (): Promise<Record<string, string>> => {
+      if (!tokens) return {};
+      return { Authorization: `Bearer ${tokens.accessToken}` };
+    },
   };
 
-  const provider = new OneDriveProvider({ auth, fetchFn: api.mockFetch as typeof fetch });
-
-  // Wrap provider methods to ensure it's connected before operations
-  // Except for lifecycle methods
-  const wrap = <T extends any[], R>(fn: (...args: T) => Promise<R>) => {
-    return async (...args: T): Promise<R> => {
-      if (!connected) await provider.connect();
-      return fn.apply(provider, args);
-    };
-  };
-
-  const proxy = new Proxy(provider, {
-    get(target, prop) {
-      if (['getDocument', 'putDocument', 'listDocuments', 'deleteDocument'].includes(prop as string)) {
-        return wrap((target as any)[prop]);
-      }
-      return (target as any)[prop];
-    }
-  });
-
-  return proxy as OneDriveProvider;
+  return new OneDriveProvider({ auth, fetchFn: api.mockFetch as typeof fetch });
 }
 
-describeProviderContract('OneDriveProvider', createContractProvider);
+describeProviderContract('OneDriveProvider', createContractProvider, { pendingFamilies: PENDING_FAMILIES });
