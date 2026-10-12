@@ -6,6 +6,30 @@ export interface TokenStore {
   remove(providerId: string): void | Promise<void>;
 }
 
+/**
+ * Default token store (03-01 / D1): keeps tokens in instance memory only.
+ * Nothing is written to localStorage, sessionStorage, or cookies, so an XSS
+ * injection cannot exfiltrate long-lived refresh tokens from persistent web
+ * storage. The trade-off is that tokens do not survive a page reload — the
+ * client signals AuthRequiredError and the consumer re-runs login().
+ * See README.md ("Token storage") for the full threat model.
+ */
+export class InMemoryTokenStore implements TokenStore {
+  private readonly tokens = new Map<string, OAuthTokens>();
+
+  get(providerId: string): OAuthTokens | null {
+    return this.tokens.get(providerId) ?? null;
+  }
+
+  set(providerId: string, tokens: OAuthTokens): void {
+    this.tokens.set(providerId, tokens);
+  }
+
+  remove(providerId: string): void {
+    this.tokens.delete(providerId);
+  }
+}
+
 export class LocalStorageTokenStore implements TokenStore {
   constructor(private readonly prefix: string = 'sb_auth_') {}
 

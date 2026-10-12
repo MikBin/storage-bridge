@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { BrowserOAuthClient } from '../oauth-client.js';
+import { LocalStorageTokenStore } from '../token-store.js';
 import { savePendingState } from '../redirect-handler.js';
 import type { OAuthProviderConfig, OAuthTokens, PendingAuthState } from '../types.js';
 import { AuthRequiredError, PENDING_STATE_TTL_MS } from '@storage-bridge/core';
@@ -454,6 +455,158 @@ describe('BrowserOAuthClient', () => {
 
       expect(error).toBeInstanceOf(AuthRequiredError);
       expect(mockFetch).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('default token store — in-memory (03-01 / D1)', () => {
+    // bypass: fast-check not installed; deterministic default-construction
+    // matrix. D1: the default configuration must persist no token material
+    // in localStorage, sessionStorage, or cookies (an XSS injection must not
+    // exfiltrate long-lived refresh tokens); web-storage persistence remains
+    // available only as explicit opt-in; after a reload simulation the fresh
+    // default client surfaces AuthRequiredError (the re-auth signal) instead
+    // of crashing, and a re-run of the flow restores a working session.
+
+    const ACCESS = 'in-memory-access';
+    const REFRESH = 'in-memory-refresh';
+
+    function successExchange(): unknown {
+      return {
+        ok: true,
+        json: async () => ({ access_token: ACCESS, refresh_token: REFRESH, expires_in: 3600, token_type: 'Bearer' }),
+      };
+    }
+
+    function snapshot(storage: Storage): Record<string, string> {
+      const contents: Record<string, string> = {};
+      for (let i = 0; i < storage.length; i += 1) {
+        const key = storage.key(i) as string;
+        contents[key] = storage.getItem(key) as string;
+      }
+      return contents;
+    }
+
+    function storageUniverse(): Record<string, string | Record<string, string>> {
+      return {
+        localStorage: snapshot(localStorage),
+        sessionStorage: snapshot(sessionStorage),
+        'document.cookie': document.cookie,
+      };
+    }
+
+    function assertNoTokenMaterial(secrets: string[]): void {
+      const universe = storageUniverse();
+      const authKeys = [
+        ...Object.keys(universe.localStorage as Record<string, string>),
+        ...Object.keys(universe.sessionStorage as Record<string, string>),
+      ].filter((key) => key.startsWith('sb_auth_'));
+      expect(authKeys, 'no sb_auth_ keys may exist in web storage by default').toEqual([]);
+      for (const slot of Object.keys(universe)) {
+        for (const secret of secrets) {
+          expect(String(universe[slot]), `slot ${slot} leaked token material`).not.toContain(secret);
+        }
+      }
+    }
+
+    function defaultClient(): BrowserOAuthClient {
+      return new BrowserOAuthClient({
+        config: mockConfig,
+        fetchFn: mockFetch as unknown as typeof fetch,
+      });
+    }
+
+    function seedPendingState(state: string, verifier: string): void {
+      savePendingState({
+        providerId: 'google-drive',
+        codeVerifier: verifier,
+        state,
+        createdAt: Date.now(),
+      });
+    }
+
+    it('default construction + full auth lifecycle writes no token material to any storage global', async () => {
+      localStorage.clear();
+      sessionStorage.clear();
+      document.cookie = '';
+
+      const inMemoryClient = defaultClient();
+      seedPendingState('state-d1', 'verifier-d1');
+      mockFetch.mockResolvedValueOnce(successExchange());
+
+      await inMemoryClient.completeAuthFlow({ kind: 'callback', code: 'auth-code', state: 'state-d1' });
+      await expect(inMemoryClient.getAccessToken()).resolves.toBe(ACCESS);
+      await inMemoryClient.getAuthHeaders();
+
+      // Mid-session (before logout can clean anything up): token material
+      // exists ONLY in memory — no sb_auth_ keys, no persisted values, ever.
+      assertNoTokenMaterial([ACCESS, REFRESH, 'verifier-d1']);
+
+      await inMemoryClient.logout();
+      assertNoTokenMaterial([ACCESS, REFRESH, 'verifier-d1']);
+    });
+
+    it('default client with no session rejects getAccessToken with AuthRequiredError and touches no storage', async () => {
+      localStorage.clear();
+      sessionStorage.clear();
+      document.cookie = '';
+      const before = storageUniverse();
+
+      const freshClient = defaultClient();
+
+      await expect(freshClient.getAccessToken()).rejects.toThrow(AuthRequiredError);
+      expect(mockFetch).not.toHaveBeenCalled();
+      expect(storageUniverse()).toEqual(before);
+    });
+
+    it('explicit LocalStorageTokenStore opt-in still persists tokens to localStorage', async () => {
+      localStorage.clear();
+      sessionStorage.clear();
+
+      const optInClient = new BrowserOAuthClient({
+        config: mockConfig,
+        tokenStore: new LocalStorageTokenStore(),
+        fetchFn: mockFetch as unknown as typeof fetch,
+      });
+      seedPendingState('state-optin', 'verifier-optin');
+      mockFetch.mockResolvedValueOnce(successExchange());
+
+      await optInClient.completeAuthFlow({ kind: 'callback', code: 'auth-code', state: 'state-optin' });
+
+      const raw = localStorage.getItem('sb_auth_google-drive');
+      expect(raw).not.toBeNull();
+      expect(JSON.parse(raw as string)).toMatchObject({ accessToken: ACCESS, refreshToken: REFRESH });
+    });
+
+    it('post-reload simulation: fresh default client re-authenticates via the flow instead of crashing', async () => {
+      localStorage.clear();
+      sessionStorage.clear();
+      document.cookie = '';
+      const pristineStorage = storageUniverse();
+
+      // Session before reload: tokens live only in this instance's memory.
+      const beforeReload = defaultClient();
+      seedPendingState('state-d1', 'verifier-d1');
+      mockFetch.mockResolvedValueOnce(successExchange());
+      await beforeReload.completeAuthFlow({ kind: 'callback', code: 'auth-code', state: 'state-d1' });
+
+      // Reload: a brand-new default client finds an empty store. It must
+      // surface AuthRequiredError promptly — the consumer's re-auth signal —
+      // without crashing and without a doomed refresh attempt (no stored
+      // refresh token exists to attempt it with).
+      const afterReload = defaultClient();
+      await expect(afterReload.getAccessToken()).rejects.toThrow(AuthRequiredError);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+
+      // Silent re-auth: the consumer re-runs login() (a redirect); the flow
+      // completes on the reloaded client and tokens are usable again — with
+      // still zero persistence across any storage global.
+      seedPendingState('state-d1-reauth', 'verifier-d1-reauth');
+      mockFetch.mockResolvedValueOnce(successExchange());
+      await afterReload.completeAuthFlow({ kind: 'callback', code: 'auth-code-2', state: 'state-d1-reauth' });
+      await expect(afterReload.getAccessToken()).resolves.toBe(ACCESS);
+
+      assertNoTokenMaterial([ACCESS, REFRESH, 'verifier-d1-reauth']);
+      expect(storageUniverse()).toEqual(pristineStorage);
     });
   });
 });

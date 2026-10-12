@@ -2,7 +2,7 @@ import type { OAuthClient, OAuthProviderConfig, OAuthTokens } from '@storage-bri
 import { TokenManager, isPendingStateUsable } from '@storage-bridge/core';
 import type { TokenStore } from './token-store.js';
 import type { CallbackResult } from './redirect-handler.js';
-import { LocalStorageTokenStore } from './token-store.js';
+import { InMemoryTokenStore } from './token-store.js';
 import { generateCodeVerifier, generateCodeChallenge } from './pkce.js';
 import { savePendingState, consumePendingState } from './redirect-handler.js';
 import { AuthRequiredError } from '@storage-bridge/core';
@@ -13,6 +13,12 @@ export { requireTokenEndpointSuccess } from '@storage-bridge/core';
 
 export interface BrowserOAuthClientOptions {
   config: OAuthProviderConfig;
+  /**
+   * Explicit token persistence. Defaults to InMemoryTokenStore (03-01 / D1):
+   * no token ever lands in localStorage, sessionStorage, or cookies. Pass
+   * LocalStorageTokenStore or SessionStorageTokenStore to opt in to web
+   * storage — see README.md for the threat model of that trade-off.
+   */
   tokenStore?: TokenStore;
   fetchFn?: typeof fetch;
 }
@@ -21,6 +27,12 @@ export interface BrowserOAuthClientOptions {
  * Browser login adapter (03-03): owns the redirect flow (PKCE generation,
  * pending-state persistence, page redirect, callback completion) and
  * delegates the entire token lifecycle to the shared core TokenManager.
+ *
+ * Token storage defaults to in-memory (03-01 / D1). After a page reload the
+ * fresh instance finds an empty store: getAccessToken() rejects with
+ * AuthRequiredError (the consumer's re-auth signal) instead of crashing, and
+ * re-running login() + completeAuthFlow() restores the session. Web-storage
+ * persistence is available only via explicit opt-in.
  */
 export class BrowserOAuthClient implements OAuthClient {
   private readonly config: OAuthProviderConfig;
@@ -30,7 +42,7 @@ export class BrowserOAuthClient implements OAuthClient {
     this.config = options.config;
     this.tokens = new TokenManager({
       config: options.config,
-      tokenStore: options.tokenStore ?? new LocalStorageTokenStore(),
+      tokenStore: options.tokenStore ?? new InMemoryTokenStore(),
       fetchFn: options.fetchFn,
     });
   }
