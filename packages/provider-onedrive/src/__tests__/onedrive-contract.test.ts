@@ -16,9 +16,11 @@ const PENDING_FAMILIES: readonly ContractFamily[] = [
   'conflict-payload',        // 02-05: ConflictError carries the encoded filename, no logical-key payload
 ];
 
-function createContractProvider(): OneDriveProvider {
-  const api = createOneDriveApiMock();
+const api = createOneDriveApiMock();
+
+function createHarness(listPageSize?: number): OneDriveProvider {
   api.reset();
+  api.setListPageSize(listPageSize ?? null);
 
   let tokens: OAuthTokens | null = null;
 
@@ -43,4 +45,15 @@ function createContractProvider(): OneDriveProvider {
   return new OneDriveProvider({ auth, fetchFn: api.mockFetch as typeof fetch });
 }
 
-describeProviderContract('OneDriveProvider', createContractProvider, { pendingFamilies: PENDING_FAMILIES });
+describeProviderContract('OneDriveProvider', () => createHarness(), {
+  pendingFamilies: PENDING_FAMILIES,
+  withListPageSize: pageSize => () => createHarness(pageSize),
+  runWithServerError: async operation => {
+    api.setGlobalFailure(500);
+    try {
+      await operation();
+    } finally {
+      api.setGlobalFailure(null);
+    }
+  },
+});

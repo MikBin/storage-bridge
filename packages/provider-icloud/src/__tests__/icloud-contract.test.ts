@@ -4,6 +4,18 @@ import { createCloudKitApiMock } from './icloud-api-mock.js';
 
 const apiMock = createCloudKitApiMock();
 
+function createHarness(listPageSize?: number): ICloudProvider {
+  apiMock.reset();
+  apiMock.setListPageSize(listPageSize ?? null);
+
+  return new ICloudProvider({
+    apiToken: 'test-token',
+    containerId: 'iCloud.com.test.container',
+    environment: 'development',
+    fetchFn: apiMock.fetchFn,
+  });
+}
+
 /**
  * Honest harness: the unmodified ICloudProvider runs the shared suite against
  * the CloudKit API mock. Lifecycle methods are no longer monkey-patched — the
@@ -18,13 +30,15 @@ const PENDING_FAMILIES: readonly ContractFamily[] = [
   'conflict-payload',        // 02-05: ConflictError carries no logical-key payload
 ];
 
-describeProviderContract('ICloudProvider', () => {
-  apiMock.reset();
-
-  return new ICloudProvider({
-    apiToken: 'test-token',
-    containerId: 'iCloud.com.test.container',
-    environment: 'development',
-    fetchFn: apiMock.fetchFn,
-  });
-}, { pendingFamilies: PENDING_FAMILIES });
+describeProviderContract('ICloudProvider', () => createHarness(), {
+  pendingFamilies: PENDING_FAMILIES,
+  withListPageSize: pageSize => () => createHarness(pageSize),
+  runWithServerError: async operation => {
+    apiMock.setGlobalFailure(500);
+    try {
+      await operation();
+    } finally {
+      apiMock.setGlobalFailure(null);
+    }
+  },
+});

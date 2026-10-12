@@ -1,4 +1,4 @@
-import { ConflictError } from '@storage-bridge/core';
+import { ConflictError, SettingsStoreError } from '@storage-bridge/core';
 import type { CloudKitRecord } from './record-mapper.js';
 
 export interface CloudKitConfig {
@@ -36,7 +36,12 @@ export class CloudKitClient {
     });
 
     if (!response.ok) {
-      throw new Error(`CloudKit API error: ${response.status} ${response.statusText}`);
+      // 5xx and other transport failures surface as a coded SettingsStoreError
+      // so callers can distinguish a server outage from a silent empty result.
+      throw new SettingsStoreError(
+        `CloudKit API error: ${response.status} ${response.statusText}`,
+        'ICLOUD_REQUEST_ERROR',
+      );
     }
 
     return response.json();
@@ -103,13 +108,27 @@ export class CloudKitClient {
   }
 
   async listRecords(): Promise<CloudKitRecord[]> {
-    const data = await this.request('/records/query', {
-      query: {
-        recordType: 'SettingsDocument'
-      }
-    });
+    const records: CloudKitRecord[] = [];
+    let continuationMarker: string | undefined;
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (data.records || []).filter((r: any) => !r.serverErrorCode);
+    // Full pagination: CloudKit queries answer with continuationMarker while
+    // more pages remain (server may also cap each page via resultsLimit);
+    // re-query with the marker until it is absent so large record sets are
+    // never silently truncated. The client's public shape stays a single
+    // Promise<CloudKitRecord[]> — continuation is an internal detail.
+    do {
+      const data = await this.request('/records/query', {
+        query: {
+          recordType: 'SettingsDocument'
+        },
+        ...(continuationMarker !== undefined ? { continuationMarker } : {})
+      });
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      records.push(...((data.records ?? []) as any[]).filter((r: any) => !r.serverErrorCode));
+      continuationMarker = typeof data.continuationMarker === 'string' ? data.continuationMarker : undefined;
+    } while (continuationMarker !== undefined);
+
+    return records;
   }
 }

@@ -43,16 +43,37 @@ function extractQueryNameLiteral(q: string): string | null {
 export function createDriveApiMock() {
   const files = new Map<string, MockFile>();
   let queryFailureStatus: number | null = null;
+  let listPageSize: number | null = null;
+  let globalFailureStatus: number | null = null;
 
   function reset(): void {
     files.clear();
     nextId = 1;
     queryFailureStatus = null;
+    listPageSize = null;
+    globalFailureStatus = null;
   }
 
   /** Arms a one-endpoint failure: the next files.list query (q param present) fails with `status` until cleared. */
   function setQueryFailure(status: number | null): void {
     queryFailureStatus = status;
+  }
+
+  /** Emulated server-side page size for files.list; null serves everything in one page. */
+  function setListPageSize(pageSize: number | null): void {
+    listPageSize = pageSize;
+  }
+
+  /** Makes every endpoint answer with `status` until cleared — emulates a server outage. */
+  function setGlobalFailure(status: number | null): void {
+    globalFailureStatus = status;
+  }
+
+  /** Resolves a `page-<offset>` style opaque token; null/invalid yields offset 0. */
+  function resolvePageToken(pageToken: string | null): number {
+    if (pageToken === null) return 0;
+    const parsed = Number.parseInt(pageToken.replace(/^page-/, ''), 10);
+    return Number.isNaN(parsed) ? 0 : parsed;
   }
 
   const mockFetch = async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
@@ -63,6 +84,13 @@ export function createDriveApiMock() {
     const authHeader = (init?.headers as Record<string, string>)?.['Authorization'];
     if (!authHeader?.startsWith('Bearer test-token')) {
       return new Response(JSON.stringify({ error: { code: 401 } }), { status: 401 });
+    }
+
+    if (globalFailureStatus !== null) {
+      return new Response(JSON.stringify({ error: { code: globalFailureStatus } }), {
+        status: globalFailureStatus,
+        headers: { 'Content-Type': 'application/json' },
+      });
     }
 
     if (path.endsWith('/files') && !path.includes('upload') && method === 'GET') {
@@ -82,7 +110,11 @@ export function createDriveApiMock() {
         results = results.filter(f => f.name === nameLiteral);
       }
 
-      const responseFiles: GoogleDriveFileRaw[] = results.map(f => ({
+      const pageSize = listPageSize ?? results.length;
+      const offset = resolvePageToken(url.searchParams.get('pageToken'));
+      const page = results.slice(offset, offset + pageSize);
+
+      const responseFiles: GoogleDriveFileRaw[] = page.map(f => ({
         id: f.id,
         name: f.name,
         mimeType: f.mimeType,
@@ -91,7 +123,12 @@ export function createDriveApiMock() {
         version: String(f.version),
       }));
 
-      return new Response(JSON.stringify({ files: responseFiles }), {
+      const body: { files: GoogleDriveFileRaw[]; nextPageToken?: string } = { files: responseFiles };
+      if (offset + pageSize < results.length) {
+        body.nextPageToken = `page-${offset + pageSize}`;
+      }
+
+      return new Response(JSON.stringify(body), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       });
@@ -191,5 +228,5 @@ export function createDriveApiMock() {
     return new Response(JSON.stringify({ error: { code: 400 } }), { status: 400 });
   };
 
-  return { mockFetch, reset, setQueryFailure, files };
+  return { mockFetch, reset, setQueryFailure, setListPageSize, setGlobalFailure, files };
 }

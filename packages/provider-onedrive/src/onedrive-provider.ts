@@ -97,15 +97,25 @@ export class OneDriveProvider extends FileBackedDocumentProvider {
   }
 
   protected async listFiles(): Promise<FileEntry[]> {
-    const res = await this.fetchFn(`${GRAPH_BASE}/children`, {
-      headers: await this.auth.getAuthHeaders(),
-    });
+    const items: FileEntry[] = [];
+    let url: string | undefined = `${GRAPH_BASE}/children`;
 
-    if (res.status === 401 || res.status === 403) throw new AuthRequiredError(this.id);
-    if (!res.ok) throw new SettingsStoreError(`OneDrive list failed: ${res.status}`, 'ONEDRIVE_LIST_ERROR');
+    // Full pagination: Graph answers children queries with @odata.nextLink;
+    // follow it until absent so large approot listings are never truncated.
+    while (url !== undefined) {
+      const res = await this.fetchFn(url, {
+        headers: await this.auth.getAuthHeaders(),
+      });
 
-    const json = await res.json() as { value?: OneDriveItemRaw[] };
-    return (json.value ?? []).map(v => toFileEntry(v, (n) => this.fileNameToKey(n)));
+      if (res.status === 401 || res.status === 403) throw new AuthRequiredError(this.id);
+      if (!res.ok) throw new SettingsStoreError(`OneDrive list failed: ${res.status}`, 'ONEDRIVE_LIST_ERROR');
+
+      const json = await res.json() as { value?: OneDriveItemRaw[]; '@odata.nextLink'?: string };
+      items.push(...(json.value ?? []).map(v => toFileEntry(v, (n) => this.fileNameToKey(n))));
+      url = json['@odata.nextLink'];
+    }
+
+    return items;
   }
 
   private async getItemMetadata(fileName: string): Promise<FileEntry> {

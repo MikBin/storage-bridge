@@ -106,30 +106,61 @@ export class GoogleDriveProvider extends FileBackedDocumentProvider {
   }
 
   public async listFiles(): Promise<FileEntry[]> {
-    const res = await this.fetchFn(
-      `${DRIVE_API_BASE}?spaces=appDataFolder&fields=files(id,name,mimeType,size,modifiedTime,version)`,
-      { headers: await this.auth.getAuthHeaders() },
-    );
+    const files: FileEntry[] = [];
+    let pageToken: string | undefined;
 
-    if (res.status === 401 || res.status === 403) throw new AuthRequiredError(this.id);
-    if (!res.ok) throw new SettingsStoreError(`Drive list failed: ${res.status}`, 'DRIVE_LIST_ERROR');
+    // Full pagination: Drive files.list serves up to the server page size per
+    // response and hands back nextPageToken; request pages until it is absent
+    // so large appDataFolder listings are never silently truncated.
+    do {
+      const params = new URLSearchParams({
+        spaces: 'appDataFolder',
+        fields: 'files(id,name,mimeType,size,modifiedTime,version),nextPageToken',
+      });
+      if (pageToken !== undefined) params.set('pageToken', pageToken);
 
-    const json = await res.json() as { files?: GoogleDriveFileRaw[] };
-    return (json.files ?? []).map(f => toFileEntry(f, (name) => this.fileNameToKey(name)));
+      const res = await this.fetchFn(`${DRIVE_API_BASE}?${params}`, {
+        headers: await this.auth.getAuthHeaders(),
+      });
+
+      if (res.status === 401 || res.status === 403) throw new AuthRequiredError(this.id);
+      if (!res.ok) throw new SettingsStoreError(`Drive list failed: ${res.status}`, 'DRIVE_LIST_ERROR');
+
+      const json = await res.json() as { files?: GoogleDriveFileRaw[]; nextPageToken?: string };
+      files.push(...(json.files ?? []).map(f => toFileEntry(f, (name) => this.fileNameToKey(name))));
+      pageToken = json.nextPageToken;
+    } while (pageToken !== undefined);
+
+    return files;
   }
 
   private async findFileByName(name: string): Promise<FileEntry | null> {
     const query = encodeURIComponent(`name='${escapeDriveQueryLiteral(name)}' and trashed=false`);
-    const res = await this.fetchFn(
-      `${DRIVE_API_BASE}?spaces=appDataFolder&q=${query}&fields=files(id,name,mimeType,size,modifiedTime,version)`,
-      { headers: await this.auth.getAuthHeaders() },
-    );
+    const files: FileEntry[] = [];
+    let pageToken: string | undefined;
 
-    if (res.status === 401 || res.status === 403) throw new AuthRequiredError(this.id);
-    if (!res.ok) throw new SettingsStoreError(`Drive query failed: ${res.status}`, 'DRIVE_QUERY_ERROR');
+    // Full pagination on the name query too: a match living beyond the first
+    // page must be found, otherwise writes would create duplicate remote files.
+    do {
+      const params = new URLSearchParams({
+        spaces: 'appDataFolder',
+        q: query,
+        fields: 'files(id,name,mimeType,size,modifiedTime,version),nextPageToken',
+      });
+      if (pageToken !== undefined) params.set('pageToken', pageToken);
 
-    const json = await res.json() as { files?: GoogleDriveFileRaw[] };
-    const files = (json.files ?? []).map(f => toFileEntry(f, (n) => this.fileNameToKey(n)));
+      const res = await this.fetchFn(`${DRIVE_API_BASE}?${params}`, {
+        headers: await this.auth.getAuthHeaders(),
+      });
+
+      if (res.status === 401 || res.status === 403) throw new AuthRequiredError(this.id);
+      if (!res.ok) throw new SettingsStoreError(`Drive query failed: ${res.status}`, 'DRIVE_QUERY_ERROR');
+
+      const json = await res.json() as { files?: GoogleDriveFileRaw[]; nextPageToken?: string };
+      files.push(...(json.files ?? []).map(f => toFileEntry(f, (n) => this.fileNameToKey(n))));
+      pageToken = json.nextPageToken;
+    } while (pageToken !== undefined);
+
     return this.findExactFileNameMatch(files, name);
   }
 

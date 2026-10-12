@@ -101,22 +101,39 @@ export class DropboxProvider extends FileBackedDocumentProvider {
   }
 
   public async listFiles(): Promise<FileEntry[]> {
-    const res = await this.fetchFn(`${API_BASE}/2/files/list_folder`, {
-      method: 'POST',
-      headers: {
-        ...(await this.auth.getAuthHeaders()),
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ path: '' }),
-    });
+    const entries: FileEntry[] = [];
+    let cursor: string | undefined;
 
-    if (res.status === 401 || res.status === 403) throw new AuthRequiredError(this.id);
-    if (!res.ok) throw new SettingsStoreError(`Dropbox list failed: ${res.status}`, 'DROPBOX_LIST_ERROR');
+    // Full pagination: list_folder answers with has_more/cursor; continue via
+    // list_folder/continue until has_more is false so large listings are never
+    // silently truncated (a truncated listing is what historically fed the
+    // duplicate-create corruption path).
+    do {
+      const res = await this.fetchFn(
+        cursor === undefined ? `${API_BASE}/2/files/list_folder` : `${API_BASE}/2/files/list_folder/continue`,
+        {
+          method: 'POST',
+          headers: {
+            ...(await this.auth.getAuthHeaders()),
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(cursor === undefined ? { path: '' } : { cursor }),
+        },
+      );
 
-    const json = await res.json() as { entries?: DropboxFileRaw[] };
-    return (json.entries ?? [])
-      .filter(e => e['.tag'] === 'file')
-      .map(e => toFileEntry(e, (n) => this.fileNameToKey(n)));
+      if (res.status === 401 || res.status === 403) throw new AuthRequiredError(this.id);
+      if (!res.ok) throw new SettingsStoreError(`Dropbox list failed: ${res.status}`, 'DROPBOX_LIST_ERROR');
+
+      const json = await res.json() as { entries?: DropboxFileRaw[]; has_more?: boolean; cursor?: string };
+      entries.push(
+        ...(json.entries ?? [])
+          .filter(e => e['.tag'] === 'file')
+          .map(e => toFileEntry(e, (n) => this.fileNameToKey(n))),
+      );
+      cursor = json.has_more === true && typeof json.cursor === 'string' ? json.cursor : undefined;
+    } while (cursor !== undefined);
+
+    return entries;
   }
 }
 

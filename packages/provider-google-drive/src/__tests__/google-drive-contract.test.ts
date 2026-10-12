@@ -26,9 +26,11 @@ const PENDING_FAMILIES: readonly ContractFamily[] = [
  */
 const PENDING_SCENARIOS: readonly string[] = [];
 
-function createContractProvider(): GoogleDriveProvider {
-  const api = createDriveApiMock();
+const api = createDriveApiMock();
+
+function createHarness(listPageSize?: number): GoogleDriveProvider {
   api.reset();
+  api.setListPageSize(listPageSize ?? null);
 
   let tokens: OAuthTokens | null = null;
 
@@ -53,7 +55,20 @@ function createContractProvider(): GoogleDriveProvider {
   return new GoogleDriveProvider({ auth, fetchFn: api.mockFetch as typeof fetch });
 }
 
+function createContractProvider(): GoogleDriveProvider {
+  return createHarness();
+}
+
 describeProviderContract('GoogleDriveProvider', createContractProvider, {
   pendingFamilies: PENDING_FAMILIES,
   pendingScenarios: PENDING_SCENARIOS,
+  withListPageSize: pageSize => () => createHarness(pageSize),
+  runWithServerError: async operation => {
+    api.setGlobalFailure(500);
+    try {
+      await operation();
+    } finally {
+      api.setGlobalFailure(null);
+    }
+  },
 });

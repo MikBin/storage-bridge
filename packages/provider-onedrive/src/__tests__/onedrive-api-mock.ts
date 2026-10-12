@@ -1,5 +1,8 @@
 import type { OneDriveItemRaw } from '../onedrive-mapper.js';
 
+/** Absolute Graph base used in emitted @odata.nextLink URLs. */
+const GRAPH_BASE = 'https://graph.microsoft.com/v1.0/me/drive/special/approot';
+
 interface MockFile {
   id: string;
   name: string;
@@ -35,11 +38,25 @@ function generateETag(): string {
  */
 export function createOneDriveApiMock() {
   const files = new Map<string, MockFile>();
+  let listPageSize: number | null = null;
+  let globalFailureStatus: number | null = null;
 
   function reset(): void {
     files.clear();
     nextId = 1;
     nextETag = 1;
+    listPageSize = null;
+    globalFailureStatus = null;
+  }
+
+  /** Emulated server-side page size for /children; null serves everything in one page. */
+  function setListPageSize(pageSize: number | null): void {
+    listPageSize = pageSize;
+  }
+
+  /** Makes every endpoint answer with `status` until cleared — emulates a server outage. */
+  function setGlobalFailure(status: number | null): void {
+    globalFailureStatus = status;
   }
 
   const mockFetch = async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
@@ -53,6 +70,14 @@ export function createOneDriveApiMock() {
       return new Response(JSON.stringify({ error: { code: 'InvalidAuthenticationToken' } }), { status: 401 });
     }
 
+    // Server outage emulation: every authenticated endpoint answers with `status`.
+    if (globalFailureStatus !== null) {
+      return new Response(JSON.stringify({ error: { code: 'serverError' } }), {
+        status: globalFailureStatus,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
     // Strip the GRAPH_BASE prefix to get the relative path
     const basePath = '/v1.0/me/drive/special/approot';
     if (!path.startsWith(basePath)) {
@@ -60,9 +85,9 @@ export function createOneDriveApiMock() {
     }
     const relative = path.slice(basePath.length);
 
-    // GET /children — list files
+    // GET /children — list files (paged via $skiptoken + @odata.nextLink)
     if (relative === '/children' && method === 'GET') {
-      const value: OneDriveItemRaw[] = Array.from(files.values()).map(f => ({
+      const all: OneDriveItemRaw[] = Array.from(files.values()).map(f => ({
         id: f.id,
         name: f.name,
         lastModifiedDateTime: f.lastModifiedDateTime,
@@ -70,7 +95,25 @@ export function createOneDriveApiMock() {
         cTag: f.cTag,
         size: f.size,
       }));
-      return new Response(JSON.stringify({ value }), {
+
+      const pageSize = listPageSize ?? all.length;
+      let offset = 0;
+      const skipToken = url.searchParams.get('$skiptoken');
+      if (skipToken !== null) {
+        const parsed = Number.parseInt(skipToken, 10);
+        if (Number.isNaN(parsed) || parsed < 0) {
+          return new Response(JSON.stringify({ error: { code: 'invalidSkipToken' } }), { status: 400 });
+        }
+        offset = parsed;
+      }
+
+      const page = all.slice(offset, offset + pageSize);
+      const body: { value: OneDriveItemRaw[]; '@odata.nextLink'?: string } = { value: page };
+      if (offset + pageSize < all.length) {
+        body['@odata.nextLink'] = `${GRAPH_BASE}/children?$skiptoken=${offset + pageSize}`;
+      }
+
+      return new Response(JSON.stringify(body), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       });
@@ -180,5 +223,5 @@ export function createOneDriveApiMock() {
     return new Response(JSON.stringify({ error: { code: 'BadRequest' } }), { status: 400 });
   };
 
-  return { mockFetch, reset, files };
+  return { mockFetch, reset, setListPageSize, setGlobalFailure, files };
 }

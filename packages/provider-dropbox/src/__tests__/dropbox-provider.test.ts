@@ -248,6 +248,50 @@ describe('DropboxProvider', () => {
     });
   });
 
+  describe('complete-listing corruption guard (02-03)', () => {
+    // bypass: fast-check not installed; deterministic page-boundary case.
+    // Universe per test: the remote store (fileCount, entriesByName) captured
+    // through the driving port; slots not asserted are pinned by before/after
+    // snapshot equality (unchanged()).
+    interface StoreSnapshot {
+      fileCount: number;
+      entriesByName: Map<string, string[]>;
+    }
+
+    function snapshotStore(api: ReturnType<typeof createDropboxApiMock>): StoreSnapshot {
+      const entriesByName = new Map<string, string[]>();
+      for (const file of api.files.values()) {
+        if (file.deleted) continue;
+        entriesByName.set(file.name, [...(entriesByName.get(file.name) ?? []), file.content]);
+      }
+      return { fileCount: entriesByName.size, entriesByName };
+    }
+
+    it('writes to a key stored beyond the first listing page update in place — no duplicate remote files are created', async () => {
+      const { provider, api } = createProvider();
+      api.setListPageSize(2);
+
+      for (let i = 0; i < 15; i += 1) {
+        await provider.writeFile(`bulk-${String(i).padStart(2, '0')}.json`, `{"i":${i}}`);
+      }
+      const before = snapshotStore(api);
+
+      // The target revision lives beyond page 1 of the listing; a truncated
+      // listing view is exactly what used to feed the duplicate-create path.
+      const listing = await provider.listFiles();
+      const target = listing.find(f => f.name === 'bulk-14.json');
+      expect(target).toBeDefined();
+
+      await provider.writeFile('bulk-14.json', '{"i":"updated"}', { expectedRevision: target!.revision });
+
+      const after = snapshotStore(api);
+      expect(after.fileCount).toBe(before.fileCount);
+      const contents = after.entriesByName.get('bulk-14.json');
+      expect(contents).toHaveLength(1);
+      expect(contents![0]).toBe('{"i":"updated"}');
+    });
+  });
+
   describe('error handling', () => {
     it('throws AuthRequiredError on 401', async () => {
       const auth: OAuthClient = {

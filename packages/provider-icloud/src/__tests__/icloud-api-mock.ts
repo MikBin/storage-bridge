@@ -7,17 +7,37 @@ export interface MockCloudKitState {
 
 export function createCloudKitApiMock(initialState: MockCloudKitState = { records: {}, counter: 0 }) {
   let state = { ...initialState, records: { ...initialState.records } };
+  let listPageSize: number | null = null;
+  let globalFailureStatus: number | null = null;
 
   return {
     reset(newState: MockCloudKitState = { records: {}, counter: 0 }) {
       state = { ...newState, records: { ...newState.records } };
+      listPageSize = null;
+      globalFailureStatus = null;
     },
     getState() {
       return state;
     },
+    /** Emulated server-side page size for /records/query; null serves everything in one page. */
+    setListPageSize(pageSize: number | null) {
+      listPageSize = pageSize;
+    },
+    /** Makes every endpoint answer with HTTP `status` until cleared — emulates a server outage. */
+    setGlobalFailure(status: number | null) {
+      globalFailureStatus = status;
+    },
     fetchFn: vi.fn(async (url: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
       const urlStr = url.toString();
       const body = init?.body ? JSON.parse(init.body as string) : null;
+
+      // Server outage emulation: every endpoint answers with `status`.
+      if (globalFailureStatus !== null) {
+        return new Response(JSON.stringify({ serverErrorCode: 'SERVICE_UNAVAILABLE', reason: 'server outage' }), {
+          status: globalFailureStatus,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
 
       if (urlStr.includes('/records/lookup')) {
         // Handle lookup
@@ -105,8 +125,8 @@ export function createCloudKitApiMock(initialState: MockCloudKitState = { record
       }
 
       if (urlStr.includes('/records/query')) {
-        // Handle query
-        const results = Object.values(state.records).map(r => ({
+        // Handle query (paged via continuationMarker, CloudKit query style)
+        const all = Object.values(state.records).map(r => ({
           recordName: r.recordName,
           recordType: 'SettingsDocument',
           fields: r.fields,
@@ -115,7 +135,26 @@ export function createCloudKitApiMock(initialState: MockCloudKitState = { record
           deleted: false
         }));
 
-        return new Response(JSON.stringify({ records: results }), {
+        const pageSize = listPageSize ?? all.length;
+        let offset = 0;
+        const marker: unknown = body?.continuationMarker;
+        if (marker !== undefined && marker !== null) {
+          if (typeof marker !== 'string' || !/^continuation-\d+$/.test(marker)) {
+            return new Response(JSON.stringify({ serverErrorCode: 'BAD_REQUEST', reason: 'invalid continuationMarker' }), {
+              status: 400,
+              headers: { 'Content-Type': 'application/json' },
+            });
+          }
+          offset = Number.parseInt(marker.replace(/^continuation-/, ''), 10);
+        }
+
+        const page = all.slice(offset, offset + pageSize);
+        const resultBody: { records: unknown[]; continuationMarker?: string } = { records: page };
+        if (offset + pageSize < all.length) {
+          resultBody.continuationMarker = `continuation-${offset + pageSize}`;
+        }
+
+        return new Response(JSON.stringify(resultBody), {
           status: 200,
           headers: { 'Content-Type': 'application/json' }
         });

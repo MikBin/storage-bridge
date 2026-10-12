@@ -50,18 +50,24 @@ export const DEFAULT_PENDING_FAMILIES: readonly ContractFamily[] = [
   'server-errors',
 ];
 
-/**
- * Families that cannot execute against current harnesses because they require
- * API-mock fault injection (paginated list responses, 5xx responses). They are
- * always declared as `it.todo` until 02-03 lands the mock support and rewrites
- * them as executable scenarios. Never list them in `pendingFamilies`.
- */
-const SCAFFOLD_ONLY_FAMILIES: ReadonlySet<ContractFamily> = new Set<ContractFamily>([
-  'pagination',
-  'server-errors',
-]);
+/** Harness hooks that must be provided before a family's scenarios can run. */
+export interface ContractSuiteHooks {
+  /**
+   * Creates a provider factory whose API mock serves list results in pages of
+   * exactly `pageSize` documents (emulating server-side pagination). Required
+   * to activate the pagination family; without it those scenarios register as
+   * `it.todo` scaffolds.
+   */
+  withListPageSize?: (pageSize: number) => ProviderFactory;
+  /**
+   * Runs `operation` while the provider's API mock rejects every request with
+   * a 5xx response. Required to activate the server-errors family; without it
+   * those scenarios register as `it.todo` scaffolds.
+   */
+  runWithServerError?: (operation: () => Promise<void>) => Promise<void>;
+}
 
-export interface ContractSuiteOptions {
+export interface ContractSuiteOptions extends ContractSuiteHooks {
   /**
    * Scenario families this provider does not satisfy yet. Replaces
    * DEFAULT_PENDING_FAMILIES when provided. List a family only while the
@@ -107,11 +113,20 @@ interface ScenarioDeclaration {
 function declareScenario(
   pending: ReadonlySet<ContractFamily>,
   pendingScenarios: ReadonlySet<string>,
+  hooks: ContractSuiteHooks,
   declaration: ScenarioDeclaration,
 ): void {
   const { family, name, body, scenarioId } = declaration;
 
-  if (SCAFFOLD_ONLY_FAMILIES.has(family)) {
+  // Families whose scenarios need API-mock emulation (paginated list
+  // responses, 5xx fault injection) stay `it.todo` scaffolds until the
+  // calling harness provides the hook that can exercise them (e.g. the
+  // in-memory fake provider cannot emulate either).
+  if (family === 'pagination' && hooks.withListPageSize === undefined) {
+    it.todo(`${name} [pending ${FAMILY_OWNERS[family]}]`);
+    return;
+  }
+  if (family === 'server-errors' && hooks.runWithServerError === undefined) {
     it.todo(`${name} [pending ${FAMILY_OWNERS[family]}]`);
     return;
   }
@@ -153,10 +168,14 @@ export function describeProviderContract(
 ): void {
   const pending = new Set<ContractFamily>(options?.pendingFamilies ?? DEFAULT_PENDING_FAMILIES);
   const pendingScenarios = new Set<string>(options?.pendingScenarios ?? []);
+  const hooks: ContractSuiteHooks = {
+    withListPageSize: options?.withListPageSize,
+    runWithServerError: options?.runWithServerError,
+  };
 
   describe(`${name} — Provider Contract`, () => {
     describe('Connect/Disconnect Lifecycle', () => {
-      declareScenario(pending, pendingScenarios, {
+      declareScenario(pending, pendingScenarios, hooks, {
         family: 'honest-lifecycle',
         name: 'starts disconnected',
         body: async () => {
@@ -171,7 +190,7 @@ export function describeProviderContract(
         expect(await provider.isConnected()).toBe(true);
       });
 
-      declareScenario(pending, pendingScenarios, {
+      declareScenario(pending, pendingScenarios, hooks, {
         family: 'honest-lifecycle',
         name: 'disconnect() transitions back to disconnected',
         body: async () => {
@@ -187,7 +206,7 @@ export function describeProviderContract(
         await expect(provider.disconnect()).resolves.toBeUndefined();
       });
 
-      declareScenario(pending, pendingScenarios, {
+      declareScenario(pending, pendingScenarios, hooks, {
         family: 'honest-lifecycle',
         name: 'getProfile() returns null when disconnected',
         body: async () => {
@@ -206,7 +225,7 @@ export function describeProviderContract(
     });
 
     describe('Disconnected Operation Policy', () => {
-      declareScenario(pending, pendingScenarios, {
+      declareScenario(pending, pendingScenarios, hooks, {
         family: 'disconnected-operations',
         name: 'getDocument() rejects with NotConnectedError before connect()',
         body: async () => {
@@ -215,7 +234,7 @@ export function describeProviderContract(
         },
       });
 
-      declareScenario(pending, pendingScenarios, {
+      declareScenario(pending, pendingScenarios, hooks, {
         family: 'disconnected-operations',
         name: 'putDocument() rejects with NotConnectedError before connect()',
         body: async () => {
@@ -226,7 +245,7 @@ export function describeProviderContract(
         },
       });
 
-      declareScenario(pending, pendingScenarios, {
+      declareScenario(pending, pendingScenarios, hooks, {
         family: 'disconnected-operations',
         name: 'deleteDocument() rejects with NotConnectedError before connect()',
         body: async () => {
@@ -235,7 +254,7 @@ export function describeProviderContract(
         },
       });
 
-      declareScenario(pending, pendingScenarios, {
+      declareScenario(pending, pendingScenarios, hooks, {
         family: 'disconnected-operations',
         name: 'listDocuments() rejects with NotConnectedError before connect()',
         body: async () => {
@@ -299,7 +318,7 @@ export function describeProviderContract(
     describe('Special-Character Keys', () => {
       // bypass: fast-check not installed; deterministic case matrix (explicit key corpus).
       for (const { label, key, scenarioId } of SPECIAL_CHAR_KEYS) {
-        declareScenario(pending, pendingScenarios, {
+        declareScenario(pending, pendingScenarios, hooks, {
           family: 'special-char-keys',
           scenarioId,
           name: `putDocument()/getDocument() round-trip a key containing ${label}`,
@@ -317,7 +336,7 @@ export function describeProviderContract(
         });
       }
 
-      declareScenario(pending, pendingScenarios, {
+      declareScenario(pending, pendingScenarios, hooks, {
         family: 'special-char-keys',
         name: 'listDocuments() reports the logical key for every special-character document',
         body: async () => {
@@ -455,7 +474,7 @@ export function describeProviderContract(
     });
 
     describe('Conflict on Missing Key (expectedRevision)', () => {
-      declareScenario(pending, pendingScenarios, {
+      declareScenario(pending, pendingScenarios, hooks, {
         family: 'conflict-missing-key',
         name: 'putDocument() with expectedRevision against a non-existent key rejects with ConflictError',
         body: async () => {
@@ -472,7 +491,7 @@ export function describeProviderContract(
 
     describe('Force Override (PutOptions.force)', () => {
       // bypass: fast-check not installed; deterministic case (stale expectation + force).
-      declareScenario(pending, pendingScenarios, {
+      declareScenario(pending, pendingScenarios, hooks, {
         family: 'conflict-force',
         name: 'putDocument() with force overwrites despite a stale expectedRevision',
         body: async () => {
@@ -492,7 +511,7 @@ export function describeProviderContract(
     });
 
     describe('ConflictError Payload', () => {
-      declareScenario(pending, pendingScenarios, {
+      declareScenario(pending, pendingScenarios, hooks, {
         family: 'conflict-payload',
         name: 'ConflictError exposes the logical key, not the storage-encoded filename',
         body: async () => {
@@ -515,7 +534,7 @@ export function describeProviderContract(
     });
 
     describe('Error Taxonomy', () => {
-      declareScenario(pending, pendingScenarios, {
+      declareScenario(pending, pendingScenarios, hooks, {
         family: 'error-taxonomy',
         name: 'every observed rejection is a SettingsStoreError carrying a code',
         body: async () => {
@@ -540,32 +559,111 @@ export function describeProviderContract(
     });
 
     describe('Pagination', () => {
-      // bypass: fast-check not installed; deterministic intent scaffolds.
-      // Activation requires API mocks that emulate paginated list responses (02-03).
-      declareScenario(pending, pendingScenarios, {
+      // bypass: fast-check not installed; deterministic multi-page matrices
+      // over a seeded flat universe (page sizes 1/2/4/7; universe of 15 docs,
+      // deliberately not divisible by any matrix page size so every traversal
+      // ends on a partial page).
+      const PAGE_SIZE_MATRIX = [1, 2, 7];
+      const EXHAUSTION_PAGE_SIZE = 4;
+      const UNIVERSE_SIZE = 15;
+
+      async function seedFlatUniverse(
+        provider: DocumentStoreProvider,
+        size: number,
+      ): Promise<Map<string, string>> {
+        const expected = new Map<string, string>();
+        for (let i = 0; i < size; i += 1) {
+          const key = `page-doc-${String(i).padStart(2, '0')}`;
+          const doc = await provider.putDocument({ key, schemaVersion: 1, updatedAt: '', data: { i } });
+          expected.set(key, doc.revision as string);
+        }
+        return expected;
+      }
+
+      /**
+       * State-delta assertion: the listed (key, revision) surface must equal
+       * the seeded flat universe exactly — no truncation, no duplicates, and
+       * every non-listed observable slot (each seeded document) unchanged.
+       */
+      function assertListingEqualsUniverse(
+        summaries: Array<{ key: string; revision?: string }>,
+        expected: Map<string, string>,
+      ): void {
+        const listed = new Map(summaries.map(summary => [summary.key, summary.revision]));
+        expect([...listed.keys()].sort()).toEqual([...expected.keys()].sort());
+        for (const [key, revision] of expected) {
+          expect(listed.get(key)).toBe(revision);
+        }
+      }
+
+      declareScenario(pending, pendingScenarios, hooks, {
         family: 'pagination',
         name: 'listDocuments() aggregates every page across pagination boundaries',
+        body: async () => {
+          for (const pageSize of PAGE_SIZE_MATRIX) {
+            const provider = await connectedProvider(hooks.withListPageSize!(pageSize));
+            const expected = await seedFlatUniverse(provider, UNIVERSE_SIZE);
+            const summaries = await provider.listDocuments();
+            assertListingEqualsUniverse(summaries, expected);
+          }
+        },
       });
-      declareScenario(pending, pendingScenarios, {
+
+      declareScenario(pending, pendingScenarios, hooks, {
         family: 'pagination',
         name: 'listDocuments() follows continuation tokens until the collection is exhausted',
+        body: async () => {
+          const provider = await connectedProvider(hooks.withListPageSize!(EXHAUSTION_PAGE_SIZE));
+          const expected = await seedFlatUniverse(provider, UNIVERSE_SIZE);
+
+          const summaries = await provider.listDocuments();
+
+          expect(summaries).toHaveLength(UNIVERSE_SIZE);
+          assertListingEqualsUniverse(summaries, expected);
+        },
       });
     });
 
     describe('Server Errors (5xx)', () => {
-      // bypass: fast-check not installed; deterministic intent scaffolds.
-      // Activation requires API mocks that emulate 5xx responses (02-03).
-      declareScenario(pending, pendingScenarios, {
+      // bypass: fast-check not installed; deterministic case per driving port.
+      declareScenario(pending, pendingScenarios, hooks, {
         family: 'server-errors',
         name: 'getDocument() on a 5xx response surfaces a SettingsStoreError, never silent null',
+        body: async () => {
+          const provider = await connectedProvider(factory);
+          await provider.putDocument({ key: 'server-error-read', schemaVersion: 1, updatedAt: '', data: { v: 1 } });
+
+          await hooks.runWithServerError!(async () => {
+            await expect(provider.getDocument('server-error-read')).rejects.toThrow(SettingsStoreError);
+          });
+        },
       });
-      declareScenario(pending, pendingScenarios, {
+
+      declareScenario(pending, pendingScenarios, hooks, {
         family: 'server-errors',
         name: 'putDocument() on a 5xx response surfaces a SettingsStoreError',
+        body: async () => {
+          const provider = await connectedProvider(factory);
+          await provider.putDocument({ key: 'server-error-write', schemaVersion: 1, updatedAt: '', data: { v: 1 } });
+
+          await hooks.runWithServerError!(async () => {
+            await expect(
+              provider.putDocument({ key: 'server-error-write', schemaVersion: 1, updatedAt: '', data: { v: 2 } }),
+            ).rejects.toThrow(SettingsStoreError);
+          });
+        },
       });
-      declareScenario(pending, pendingScenarios, {
+
+      declareScenario(pending, pendingScenarios, hooks, {
         family: 'server-errors',
         name: 'listDocuments() on a 5xx response surfaces a SettingsStoreError',
+        body: async () => {
+          const provider = await connectedProvider(factory);
+
+          await hooks.runWithServerError!(async () => {
+            await expect(provider.listDocuments()).rejects.toThrow(SettingsStoreError);
+          });
+        },
       });
     });
   });
