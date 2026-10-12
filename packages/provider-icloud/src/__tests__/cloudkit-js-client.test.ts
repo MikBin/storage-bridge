@@ -303,5 +303,40 @@ describe('CloudKitJsClient (CloudKit JS adapter, D3)', () => {
         continuationMarker: 'continuation-1',
       });
     });
+
+    it('surfaces per-record serverErrorCode entries as ICLOUD_REQUEST_ERROR carrying the failed count and first code', async () => {
+      // bypass: fast-check not installed; deterministic partial-failure case
+      // (one good record plus two failed entries spread across two pages) —
+      // a query that silently drops failed records would hide data loss.
+      const good = {
+        recordName: 'r1',
+        recordType: 'SettingsDocument',
+        fields: { payload: { value: '{}' } },
+      };
+      fake.db.performQuery
+        .mockResolvedValueOnce({
+          records: [good, { recordName: 'bad-1', serverErrorCode: 'CONFLICT' }],
+          continuationMarker: 'continuation-1',
+        })
+        .mockResolvedValueOnce({
+          records: [{ recordName: 'bad-2', serverErrorCode: 'UNKNOWN_ERROR' }],
+        });
+
+      const client = await setUpClient();
+      const error = await client.queryRecords('SettingsDocument').then(
+        () => {
+          throw new Error('Expected queryRecords to reject');
+        },
+        (err: unknown) => err,
+      );
+
+      expect(error).toBeInstanceOf(SettingsStoreError);
+      expect((error as SettingsStoreError).code).toBe('ICLOUD_REQUEST_ERROR');
+      const summary = `${(error as Error).message} ${String(
+        (error as { cause?: { message?: string } }).cause?.message ?? '',
+      )}`;
+      expect(summary).toContain('2');
+      expect(summary).toContain('CONFLICT');
+    });
   });
 });

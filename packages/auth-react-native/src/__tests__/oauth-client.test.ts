@@ -14,6 +14,20 @@ const mockConfig: ReactNativeOAuthConfig = {
   redirectUri: 'myapp://oauth/callback',
 };
 
+/**
+ * Fake of a token-endpoint 200 Response honoring the single-consumable-body
+ * contract: the shared core TokenManager reads text() and parses, so the
+ * double exposes the same bytes through both text() and json().
+ */
+function tokenEndpointBody(body: Record<string, unknown>): unknown {
+  const payload = JSON.stringify(body);
+  return {
+    ok: true,
+    text: async () => payload,
+    json: async () => JSON.parse(payload) as unknown,
+  };
+}
+
 const mockPromptAsync = vi.fn();
 
 vi.mock('expo-auth-session', () => {
@@ -61,15 +75,14 @@ describe('ReactNativeOAuthClient', () => {
         params: { code: 'native-auth-code', state: 'some-state' },
       });
 
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
+      mockFetch.mockResolvedValueOnce(
+        tokenEndpointBody({
           access_token: 'native-access',
           refresh_token: 'native-refresh',
           expires_in: 3600,
           token_type: 'Bearer',
         }),
-      });
+      );
 
       await client.login();
 
@@ -139,15 +152,14 @@ describe('ReactNativeOAuthClient', () => {
           tokenType: 'Bearer',
         });
 
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
+      mockFetch.mockResolvedValueOnce(
+        tokenEndpointBody({
           access_token: 'refreshed-native-token',
           refresh_token: 'new-refresh',
           expires_in: 3600,
           token_type: 'Bearer',
         }),
-      });
+      );
 
       const token = await client.getAccessToken();
       expect(token).toBe('refreshed-native-token');
@@ -188,15 +200,14 @@ describe('ReactNativeOAuthClient', () => {
     }
 
     function successTokenResponse(): void {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
+      mockFetch.mockResolvedValueOnce(
+        tokenEndpointBody({
           access_token: 'native-access',
           refresh_token: 'native-refresh',
           expires_in: 3600,
           token_type: 'Bearer',
         }),
-      });
+      );
     }
 
     async function captureRejection(operation: Promise<unknown>): Promise<unknown> {
@@ -333,14 +344,13 @@ describe('ReactNativeOAuthClient', () => {
       );
 
       seedRefreshableTokens();
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
+      mockFetch.mockResolvedValueOnce(
+        tokenEndpointBody({
           access_token: 'refreshed-native-token',
           expires_in: 3600,
           token_type: 'Bearer',
         }),
-      });
+      );
       await expect(client.getAccessToken()).resolves.toBe('refreshed-native-token');
     });
   });
@@ -371,15 +381,12 @@ describe('ReactNativeOAuthClient', () => {
     }
 
     function successResponse(): unknown {
-      return {
-        ok: true,
-        json: async () => ({
-          access_token: 'native-new-access',
-          refresh_token: 'native-new-refresh',
-          expires_in: 3600,
-          token_type: 'Bearer',
-        }),
-      };
+      return tokenEndpointBody({
+        access_token: 'native-new-access',
+        refresh_token: 'native-new-refresh',
+        expires_in: 3600,
+        token_type: 'Bearer',
+      });
     }
 
     it('exchanges the code with the stored verifier on a fresh matching pending state', async () => {

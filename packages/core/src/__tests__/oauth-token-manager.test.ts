@@ -139,16 +139,31 @@ async function captureRejection(operation: Promise<unknown>): Promise<unknown> {
 }
 
 function tokenEndpointSuccess(body: Record<string, unknown> = {}): Response {
+  const payload = JSON.stringify({
+    access_token: 'new-access',
+    refresh_token: 'new-refresh',
+    expires_in: 1800,
+    token_type: 'Bearer',
+    ...body,
+  });
   return {
     ok: true,
     status: 200,
-    json: async () => ({
-      access_token: 'new-access',
-      refresh_token: 'new-refresh',
-      expires_in: 1800,
-      token_type: 'Bearer',
-      ...body,
-    }),
+    text: async () => payload,
+    json: async () => JSON.parse(payload),
+  } as unknown as Response;
+}
+
+/**
+ * A 200 response carrying an arbitrary raw body: the runtime contract is a
+ * single consumable body, so json() parses the same text the adapter reads.
+ */
+function tokenEndpointRawBody(body: string): Response {
+  return {
+    ok: true,
+    status: 200,
+    text: async () => body,
+    json: async () => JSON.parse(body) as unknown,
   } as unknown as Response;
 }
 
@@ -677,6 +692,99 @@ describe('TokenManager (03-03 shared token lifecycle)', () => {
       const causeMessage = String((error as { cause?: { message?: string } }).cause?.message);
       expect(causeMessage).toContain('502');
       expect(causeMessage).toContain('<unreadable body>');
+    });
+  });
+
+  describe('200-response body validation (parseTokens)', () => {
+    // bypass: fast-check not installed; deterministic case matrix over the
+    // 200-body shape universe {garbage JSON, missing/empty access_token,
+    // non-string refresh_token, non-number expires_in, valid payload}. A 200
+    // response is persisted only when the parsed shape is a usable token
+    // payload; every other shape rejects AuthExchangeError with the body
+    // excerpt as cause and never reaches the token store.
+    interface BodyCase {
+      label: string;
+      body: string;
+    }
+
+    const INVALID_BODY_CASES: BodyCase[] = [
+      { label: 'garbage body (not JSON)', body: 'not-json-at-all' },
+      {
+        label: 'missing access_token',
+        body: JSON.stringify({ refresh_token: 'r', expires_in: 60 }),
+      },
+      {
+        label: 'empty access_token',
+        body: JSON.stringify({ access_token: '', refresh_token: 'r' }),
+      },
+      {
+        label: 'non-string refresh_token',
+        body: JSON.stringify({ access_token: 'a', refresh_token: 42 }),
+      },
+      {
+        label: 'non-number expires_in',
+        body: JSON.stringify({ access_token: 'a', expires_in: '60' }),
+      },
+    ];
+
+    it.each(INVALID_BODY_CASES)(
+      '$label: rejects AuthExchangeError with the body excerpt and persists nothing',
+      async (bodyCase) => {
+        const { manager, store, fetchFn } = makeManager({ asyncBacked: true });
+        fetchFn.mockResolvedValueOnce(tokenEndpointRawBody(bodyCase.body));
+
+        const error = await captureRejection(manager.exchangeAuthorizationCode('auth-code'));
+
+        expect(error).toBeInstanceOf(AuthExchangeError);
+        const causeMessage = String((error as { cause?: { message?: string } }).cause?.message);
+        expect(causeMessage).toContain(bodyCase.body);
+        expect(snapshot(store)).toEqual({
+          access: undefined,
+          refresh: undefined,
+          expiry: undefined,
+        });
+      },
+    );
+
+    it('valid 200 payload passes validation and is persisted', async () => {
+      const { manager, store, fetchFn } = makeManager({ asyncBacked: true });
+      fetchFn.mockResolvedValueOnce(
+        tokenEndpointRawBody(
+          JSON.stringify({
+            access_token: 'good-access',
+            refresh_token: 'good-refresh',
+            expires_in: 90,
+          }),
+        ),
+      );
+
+      await expect(manager.exchangeAuthorizationCode('auth-code')).resolves.toMatchObject({
+        accessToken: 'good-access',
+        refreshToken: 'good-refresh',
+      });
+
+      expect(snapshot(store)).toEqual({
+        access: 'good-access',
+        refresh: 'good-refresh',
+        expiry: NOW + 90_000,
+      });
+    });
+
+    it('a garbage 200 during refresh preserves the stored grant (AuthExchangeError, no wipe)', async () => {
+      const { manager, store, fetchFn } = makeManager({ asyncBacked: true });
+      await store.set(PROVIDER_ID, nearExpiryTokens());
+      fetchFn.mockResolvedValueOnce(tokenEndpointRawBody('<html>gateway garbage</html>'));
+
+      const error = await captureRejection(manager.getAccessToken());
+
+      expect(error).toBeInstanceOf(AuthExchangeError);
+      const causeMessage = String((error as { cause?: { message?: string } }).cause?.message);
+      expect(causeMessage).toContain('gateway garbage');
+      expect(snapshot(store)).toEqual({
+        access: 'stored-access',
+        refresh: 'stored-refresh',
+        expiry: NOW + 30_000,
+      });
     });
   });
 });

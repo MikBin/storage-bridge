@@ -14,6 +14,20 @@ const mockConfig: OAuthProviderConfig = {
   scopes: ['https://www.googleapis.com/auth/drive.appdata'],
 };
 
+/**
+ * Fake of a token-endpoint 200 Response honoring the single-consumable-body
+ * contract: the shared core TokenManager reads text() and parses, so the
+ * double exposes the same bytes through both text() and json().
+ */
+function tokenEndpointBody(body: Record<string, unknown>): unknown {
+  const payload = JSON.stringify(body);
+  return {
+    ok: true,
+    text: async () => payload,
+    json: async () => JSON.parse(payload) as unknown,
+  };
+}
+
 describe('BrowserOAuthClient', () => {
   let client: BrowserOAuthClient;
   let mockFetch: ReturnType<typeof vi.fn>;
@@ -100,15 +114,14 @@ describe('BrowserOAuthClient', () => {
           tokenType: 'Bearer',
         });
 
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
+      mockFetch.mockResolvedValueOnce(
+        tokenEndpointBody({
           access_token: 'refreshed-token',
           refresh_token: 'new-refresh',
           expires_in: 3600,
           token_type: 'Bearer',
         }),
-      });
+      );
 
       const token = await client.getAccessToken();
       expect(token).toBe('refreshed-token');
@@ -148,15 +161,14 @@ describe('BrowserOAuthClient', () => {
         createdAt: Date.now(),
       });
 
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
+      mockFetch.mockResolvedValueOnce(
+        tokenEndpointBody({
           access_token: 'new-access',
           refresh_token: 'new-refresh',
           expires_in: 3600,
           token_type: 'Bearer',
         }),
-      });
+      );
 
       await client.completeAuthFlow({ kind: 'callback', code: 'auth-code', state: 'test-state' });
 
@@ -347,15 +359,14 @@ describe('BrowserOAuthClient', () => {
 
     it('200 responses still exchange successfully on both paths (state-delta: happy path unchanged)', async () => {
       await mockPendingState();
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
+      mockFetch.mockResolvedValueOnce(
+        tokenEndpointBody({
           access_token: 'a1',
           refresh_token: 'r1',
           expires_in: 3600,
           token_type: 'Bearer',
         }),
-      });
+      );
       await completeAuthFlowCall();
       expect(mockTokenStore.set).toHaveBeenCalledWith(
         'google-drive',
@@ -363,10 +374,9 @@ describe('BrowserOAuthClient', () => {
       );
 
       seedRefreshableTokens();
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ access_token: 'a2', expires_in: 3600, token_type: 'Bearer' }),
-      });
+      mockFetch.mockResolvedValueOnce(
+        tokenEndpointBody({ access_token: 'a2', expires_in: 3600, token_type: 'Bearer' }),
+      );
       await expect(refreshCall()).resolves.toBe('a2');
     });
   });
@@ -397,15 +407,12 @@ describe('BrowserOAuthClient', () => {
     }
 
     function successResponse(): unknown {
-      return {
-        ok: true,
-        json: async () => ({
-          access_token: 'new-access',
-          refresh_token: 'new-refresh',
-          expires_in: 3600,
-          token_type: 'Bearer',
-        }),
-      };
+      return tokenEndpointBody({
+        access_token: 'new-access',
+        refresh_token: 'new-refresh',
+        expires_in: 3600,
+        token_type: 'Bearer',
+      });
     }
 
     it('rejects a providerId mismatch without touching the token endpoint', async () => {
@@ -507,15 +514,12 @@ describe('BrowserOAuthClient', () => {
     const REFRESH = 'in-memory-refresh';
 
     function successExchange(): unknown {
-      return {
-        ok: true,
-        json: async () => ({
-          access_token: ACCESS,
-          refresh_token: REFRESH,
-          expires_in: 3600,
-          token_type: 'Bearer',
-        }),
-      };
+      return tokenEndpointBody({
+        access_token: ACCESS,
+        refresh_token: REFRESH,
+        expires_in: 3600,
+        token_type: 'Bearer',
+      });
     }
 
     function snapshot(storage: Storage): Record<string, string> {

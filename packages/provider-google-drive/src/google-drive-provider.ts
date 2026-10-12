@@ -87,8 +87,9 @@ export class GoogleDriveProvider extends FileBackedDocumentProvider {
     // Best-effort concurrency (D2): Drive v3 media PATCH has no server-side
     // content precondition, so this revision check is client-side only. A
     // concurrent writer landing between this read and the PATCH is NOT
-    // detected (TOCTOU window remains) — the README documents this caveat
-    // (documentation owned by step 04-02). `force` skips the check entirely.
+    // detected (TOCTOU window remains) — documented as a best-effort
+    // trade-off in the "Concurrency semantics (decision D2)" section of
+    // docs/settings-store-architecture.md. `force` skips the check entirely.
     if (!options?.force && options?.expectedRevision !== undefined) {
       if (!existing || existing.revision !== options.expectedRevision) {
         // Payload is the caller's logical key, never the encoded remote name.

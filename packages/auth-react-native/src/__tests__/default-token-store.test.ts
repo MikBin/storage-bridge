@@ -22,6 +22,20 @@ vi.mock('expo-auth-session', () => {
   };
 });
 
+/**
+ * Fake of a token-endpoint 200 Response honoring the single-consumable-body
+ * contract: the shared core TokenManager reads text() and parses, so the
+ * double exposes the same bytes through both text() and json().
+ */
+function tokenEndpointBody(body: Record<string, unknown>): unknown {
+  const payload = JSON.stringify(body);
+  return {
+    ok: true,
+    text: async () => payload,
+    json: async () => JSON.parse(payload) as unknown,
+  };
+}
+
 const mockConfig: ReactNativeOAuthConfig = {
   providerId: 'google-drive',
   clientId: 'native-client-id',
@@ -46,15 +60,14 @@ function successAuthPrompt(): void {
 }
 
 function successTokenResponse(mockFetch: ReturnType<typeof vi.fn>, accessToken: string): void {
-  mockFetch.mockResolvedValueOnce({
-    ok: true,
-    json: async () => ({
+  mockFetch.mockResolvedValueOnce(
+    tokenEndpointBody({
       access_token: accessToken,
       refresh_token: 'token-refresh',
       expires_in: 3600,
       token_type: 'Bearer',
     }),
-  });
+  );
 }
 
 describe('default token store resolution (02-07)', () => {

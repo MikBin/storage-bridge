@@ -177,7 +177,7 @@ export class CloudKitJsClient implements CloudKitClient {
   async queryRecords(recordType: string): Promise<CloudKitRecordRaw[]> {
     const db = this.database();
     const query = this.expectDbFunction(db, 'performQuery');
-    const records: CloudKitRecordRaw[] = [];
+    const entries: unknown[] = [];
     // Full pagination: CloudKit queries answer with continuationMarker while
     // more pages remain; re-query with the marker until it is absent so large
     // record sets are never silently truncated (02-03 continuation shape).
@@ -190,15 +190,28 @@ export class CloudKitJsClient implements CloudKitClient {
       } catch (error) {
         throw mapCloudKitError(error, 'ICLOUD_REQUEST_ERROR');
       }
-      for (const record of page.records ?? []) {
-        if (!hasServerErrorCode(record)) records.push(record as CloudKitRecordRaw);
-      }
+      entries.push(...(page.records ?? []));
       continuationMarker =
         typeof page.continuationMarker === 'string' && page.continuationMarker.length > 0
           ? page.continuationMarker
           : undefined;
     } while (continuationMarker !== undefined);
-    return records;
+
+    // CloudKit answers a partial query failure with in-band per-record
+    // serverErrorCode entries; silently dropping them would hide data loss,
+    // so they surface as one coded error carrying the failed count and the
+    // first code (review N5).
+    const failed = entries.filter(hasServerErrorCode);
+    if (failed.length > 0) {
+      const firstCode = String((failed[0] as { serverErrorCode: unknown }).serverErrorCode);
+      const summary = `${failed.length} failed record(s); first serverErrorCode: ${firstCode}`;
+      throw new SettingsStoreError(
+        `CloudKit query returned ${summary}`,
+        'ICLOUD_REQUEST_ERROR',
+        new Error(summary),
+      );
+    }
+    return entries as CloudKitRecordRaw[];
   }
 
   private database(): CloudKitJsDatabase {

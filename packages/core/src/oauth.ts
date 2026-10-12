@@ -99,6 +99,14 @@ async function readBodyExcerpt(response: Response): Promise<string> {
   }
 }
 
+/** AuthExchangeError chaining an Error that carries the ≤200-char body excerpt. */
+function invalidTokenBodyError(providerId: string, excerpt: string): AuthExchangeError {
+  return new AuthExchangeError(
+    providerId,
+    new Error(`Invalid 200 token-endpoint body: ${excerpt}`),
+  );
+}
+
 /**
  * Classifies a token-endpoint failure response (RFC 6749), distinguishing
  * genuine auth rejections from transport/server failures (02-06):
@@ -185,7 +193,36 @@ export class TokenManager {
     response: Response,
     fallbackRefreshToken?: string,
   ): Promise<OAuthTokens> {
-    const json = (await response.json()) as TokenEndpointResponseJson;
+    // A 200 body is untrusted until validated: read it once as text, then
+    // parse and shape-check before anything is persisted. Every failure mode
+    // (unreadable body, malformed JSON, wrong token shape) rejects
+    // AuthExchangeError with the ≤200-char body excerpt as cause — mirroring
+    // the rigor of requireTokenEndpointSuccess — and never reaches the store.
+    let raw: string;
+    try {
+      raw = await response.text();
+    } catch {
+      raw = '';
+    }
+    const excerpt = raw.slice(0, BODY_EXCERPT_MAX_CHARS) || '<no body>';
+
+    let json: TokenEndpointResponseJson | null;
+    try {
+      json = JSON.parse(raw) as TokenEndpointResponseJson | null;
+    } catch {
+      throw invalidTokenBodyError(this.config.providerId, excerpt);
+    }
+
+    if (
+      json === null ||
+      typeof json.access_token !== 'string' ||
+      json.access_token.length === 0 ||
+      (json.refresh_token !== undefined && typeof json.refresh_token !== 'string') ||
+      (json.expires_in !== undefined && typeof json.expires_in !== 'number')
+    ) {
+      throw invalidTokenBodyError(this.config.providerId, excerpt);
+    }
+
     return {
       accessToken: json.access_token,
       refreshToken: json.refresh_token ?? fallbackRefreshToken,

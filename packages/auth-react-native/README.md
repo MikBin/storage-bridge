@@ -13,12 +13,16 @@ pnpm add @storage-bridge/auth-react-native
 ## Usage
 
 ```ts
-import { ReactNativeOAuthClient, SecureTokenStore } from '@storage-bridge/auth-react-native';
+import { ReactNativeOAuthClient } from '@storage-bridge/auth-react-native';
 
-const client = new ReactNativeOAuthClient({
+const client = await ReactNativeOAuthClient.create({
   config, // ReactNativeOAuthConfig (OAuthProviderConfig)
-  tokenStore: new SecureTokenStore(),
 });
 ```
+
+`create()` resolves the default secure token store from `expo-secure-store`
+dynamically; pass an explicit `tokenStore` in the options to plug in a custom
+store. Direct construction throws — the client requires secure token
+persistence.
 
 See the [root README](../../README.md) for the full documentation.
