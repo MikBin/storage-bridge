@@ -1,0 +1,571 @@
+{
+  "roadmap": {
+    "project_id": "review-remediation",
+    "goal": "Remediate tri-review findings: token-storage security, provider data-loss bugs, concurrency semantics, iCloud spec conformance, OAuth port relocation, and release readiness across storage-bridge packages",
+    "created": "2026-10-12",
+    "status": "ready"
+  },
+  "phases": [
+    {
+      "id": "01",
+      "name": "Foundation — Enforcement and Guardrails",
+      "steps": [
+        {
+          "id": "01-01",
+          "name": "Expand provider contract suite",
+          "description": "Extend describeProviderContract with special-character keys, disconnected-operation, expectedRevision, error-taxonomy, ConflictError-payload, and pagination/5xx scenarios; remove per-package harness hacks so unmodified providers run the shared suite.",
+          "criteria": [
+            "Contract suite covers keys containing apostrophe, space, slash, colon, unicode, and emoji; every provider round-trips each.",
+            "Data operations before connect reject with NotConnectedError uniformly across all providers under test.",
+            "Write with expectedRevision against a non-existent key rejects with ConflictError uniformly across providers.",
+            "Every observed rejection is instanceof SettingsStoreError carrying a code; ConflictError payload exposes the logical key.",
+            "Mocks emulate pagination page boundaries and 5xx responses; per-package harness hacks and `null as any` casts are removed."
+          ],
+          "files_to_modify": [
+            "packages/testing/src/provider-contract-tests.ts",
+            "packages/testing/src/index.ts",
+            "packages/provider-icloud/src/__tests__/icloud-contract.test.ts",
+            "packages/provider-onedrive/src/__tests__/onedrive-contract.test.ts",
+            "packages/provider-google-drive/src/__tests__/google-drive-contract.test.ts",
+            "packages/provider-dropbox/src/__tests__/dropbox-contract.test.ts"
+          ],
+          "implementation_notes": "- Enforcement precedes all fixes: Phase 02 lands against this suite (decisions.md: 'Why the full 4-wave solution').\n- Encodes the single disconnected-op policy (NotConnectedError), the D2 expectation (expectedRevision on missing key = ConflictError), and the logical-key conflict payload asserted by 02-05.\n- Deletes: icloud monkey-patching (icloud-contract.test.ts:17-28), onedrive auto-connect Proxy, drive/dropbox logged-out auth mocks, `null as any`.\n- RED mechanism: new target-behavior scenarios land as per-provider skipped/expected-failure scaffolds; existing green scenarios stay green. Remediation steps own unskipping (02-01 keys/errors, 02-02 conflict semantics, 02-03 pagination, 02-04 pre-connect, 02-05 conflict payload, 02-06 error taxonomy, 02-08 iCloud lifecycle).\n- Gate: suite red only on scaffolded target-behavior scenarios; no provider modification in this step.\nTEST PARADIGM (mandatory): Unit tests for this step MUST be written as property-based tests using Hypothesis @given strategies + state-delta matchers (assert_state_delta over a declared universe with strict=True). Single-example unit tests are FALLBACK only — document why in a `# bypass:` comment if used. Acceptance scenarios MUST be framed as Property: blocks (quantified preconditions + invariant outcomes) where the contract supports it; classic Scenario: is fallback. Integration and E2E tests REMAIN single-example — they verify wiring, not invariants. Universe declaration is mandatory even when only one slot is checked: the unchanged() predicate covers the rest.",
+          "dependencies": [],
+          "estimated_effort": "8h",
+          "test_file": "",
+          "scenario_name": ""
+        },
+        {
+          "id": "01-02",
+          "name": "Monorepo ESLint wiring",
+          "description": "Install eslint at root, add eslint.config.js to the four packages missing it, share rules via packages/eslint-config, and make pnpm lint pass in all 8 packages.",
+          "criteria": [
+            "eslint is a root devDependency; every package resolves the shared flat config from packages/eslint-config.",
+            "testing, provider-google-drive, provider-dropbox, provider-onedrive each gain a working eslint.config.js extending shared rules.",
+            "`pnpm lint` exits 0 in all 8 packages with no undocumented rule disabling."
+          ],
+          "files_to_modify": [
+            "package.json",
+            "pnpm-workspace.yaml",
+            "packages/eslint-config/package.json",
+            "packages/eslint-config/index.js",
+            "packages/testing/eslint.config.js",
+            "packages/provider-google-drive/eslint.config.js",
+            "packages/provider-dropbox/eslint.config.js",
+            "packages/provider-onedrive/eslint.config.js"
+          ],
+          "implementation_notes": "- Lint is red 8/8 today; eslint exists only in packages/eslint-config/package.json:6-8.\n- Single shared flat config; per-package files stay thin.\nEXEMPT FROM PARADIGM: config-only deliverable, no application code ships in this step. Compensate with property-based test at unit level on adjacent slot 01-01. STRUCTURAL VERIFICATION (mandatory): verify the deliverable structurally (config parses, lint executes) gated in CI.",
+          "dependencies": [],
+          "estimated_effort": "4h",
+          "test_file": "",
+          "scenario_name": ""
+        },
+        {
+          "id": "01-03",
+          "name": "GitHub Actions CI pipeline",
+          "description": "Add .github/workflows/ci.yml running frozen-lockfile install, typecheck, lint, build, test on Node 22 and 24 for pushes to main and all pull requests.",
+          "criteria": [
+            "Workflow triggers on push to main and every pull request; matrix covers Node 22 and Node 24.",
+            "Pipeline runs install --frozen-lockfile, then typecheck, lint, build, test; any step failure fails the run.",
+            "Setup uses pnpm/action-setup and actions/setup-node@v4 with pnpm cache enabled."
+          ],
+          "files_to_modify": [
+            ".github/workflows/ci.yml"
+          ],
+          "implementation_notes": "- No .github/ exists today; CI makes 01-01/01-02 gates enforceable.\n- Node >= 22 aligns with the engines baseline raised during 04-03.\nEXEMPT FROM PARADIGM: workflow-only deliverable, no application code ships in this step. Compensate with property-based test at unit level on adjacent slot 01-01. STRUCTURAL VERIFICATION (mandatory): verify the deliverable structurally (workflow schema valid, pipeline executes on the PR) gated in CI.",
+          "dependencies": [
+            "01-02"
+          ],
+          "estimated_effort": "3h",
+          "test_file": "",
+          "scenario_name": ""
+        }
+      ],
+      "implementation_scope": [
+        "packages/testing/src/**",
+        "packages/*/eslint.config.js",
+        "packages/eslint-config/**",
+        "package.json",
+        "pnpm-workspace.yaml",
+        ".github/workflows/ci.yml"
+      ]
+    },
+    {
+      "id": "02",
+      "name": "Correctness — Provider Data-Integrity Fixes",
+      "steps": [
+        {
+          "id": "02-01",
+          "name": "Google Drive query safety and error honesty",
+          "description": "Escape or validate quoted literals in name queries so apostrophe-containing keys round-trip; propagate query HTTP failures as SettingsStoreError; de-duplicate matches by exact filename.",
+          "criteria": [
+            "Apostrophe, space, slash, colon, unicode, emoji keys round-trip through put/get with identical data and no duplicate remote files.",
+            "Query HTTP failures reject with coded SettingsStoreError; query errors never masquerade as empty results.",
+            "Multiple same-name remote files resolve to the exact name match; repeated writes create no duplicates."
+          ],
+          "files_to_modify": [
+            "packages/provider-google-drive/src/google-drive-provider.ts",
+            "packages/core/src/providers/file-backed-document-provider.ts"
+          ],
+          "implementation_notes": "- Reproduced data loss: key with apostrophe breaks the q literal (google-drive-provider.ts:106-117) — put succeeds, get returns null, duplicates accumulate.\n- Error swallow at :112 returns null on query failure; must become coded rejection.\n- Exact-name disambiguation lives in the shared file-backed base (file-backed-document-provider.ts:32-34).\nTEST PARADIGM (mandatory): Unit tests for this step MUST be written as property-based tests using Hypothesis @given strategies + state-delta matchers (assert_state_delta over a declared universe with strict=True). Single-example unit tests are FALLBACK only — document why in a `# bypass:` comment if used. Acceptance scenarios MUST be framed as Property: blocks (quantified preconditions + invariant outcomes) where the contract supports it; classic Scenario: is fallback. Integration and E2E tests REMAIN single-example — they verify wiring, not invariants. Universe declaration is mandatory even when only one slot is checked: the unchanged() predicate covers the rest.",
+          "dependencies": [
+            "01-01"
+          ],
+          "estimated_effort": "5h",
+          "test_file": "",
+          "scenario_name": ""
+        },
+        {
+          "id": "02-02",
+          "name": "Optimistic-by-default concurrency (D2)",
+          "description": "Manager passes the preceding read's revision as the expected revision by default with explicit force opt-out; Dropbox uses conditional update mode; OneDrive keeps If-Match; Drive documented best-effort; record-backed sends changeTag only from explicit expectations.",
+          "criteria": [
+            "Default write after a read rejects with ConflictError when the remote revision advanced; interleaved writes never lose updates.",
+            "Explicit force opt-out overwrites despite a concurrent remote change and succeeds.",
+            "Dropbox writes use conditional update mode keyed to the read revision; OneDrive retains If-Match semantics.",
+            "Record-backed providers send changeTag only from explicit caller expectations, never from the document's own revision."
+          ],
+          "files_to_modify": [
+            "packages/core/src/manager.ts",
+            "packages/core/src/types.ts",
+            "packages/core/src/providers/file-backed-document-provider.ts",
+            "packages/core/src/providers/record-backed-document-provider.ts",
+            "packages/provider-google-drive/src/google-drive-provider.ts",
+            "packages/provider-dropbox/src/dropbox-provider.ts",
+            "packages/provider-onedrive/src/onedrive-provider.ts",
+            "packages/provider-icloud/src/icloud-provider.ts"
+          ],
+          "implementation_notes": "- D2 (decisions.md): ends the 3-providers-LWW vs iCloud-conditional divergence; matches README's optimistic-concurrency promise.\n- Divergence evidence: manager.ts:69-83, google-drive-provider.ts:68-72, dropbox-provider.ts:71-75+82, onedrive-provider.ts:68-78, icloud-provider.ts:57-64, record-backed-document-provider.ts:44-47.\n- PutOptions gains the force opt-out; Drive best-effort documented in README (04-02 links it).\nTEST PARADIGM (mandatory): Unit tests for this step MUST be written as property-based tests using Hypothesis @given strategies + state-delta matchers (assert_state_delta over a declared universe with strict=True). Single-example unit tests are FALLBACK only — document why in a `# bypass:` comment if used. Acceptance scenarios MUST be framed as Property: blocks (quantified preconditions + invariant outcomes) where the contract supports it; classic Scenario: is fallback. Integration and E2E tests REMAIN single-example — they verify wiring, not invariants. Universe declaration is mandatory even when only one slot is checked: the unchanged() predicate covers the rest.",
+          "dependencies": [
+            "01-01"
+          ],
+          "estimated_effort": "8h",
+          "test_file": "",
+          "scenario_name": ""
+        },
+        {
+          "id": "02-03",
+          "name": "Full pagination on all four providers",
+          "description": "Drive follows pageToken, Dropbox continues has_more/cursor, OneDrive follows @odata.nextLink, CloudKit queries continue via continuation until exhaustion; mocks emulate multi-page responses.",
+          "criteria": [
+            "Listing returns every remote document for arbitrary page sizes; properties compare against a flat universe with no truncation.",
+            "Each provider mock serves multi-page responses and traversal is exercised at every page boundary.",
+            "Complete listing eliminates the Dropbox truncated-listing duplicate-create corruption path."
+          ],
+          "files_to_modify": [
+            "packages/provider-google-drive/src/google-drive-provider.ts",
+            "packages/provider-google-drive/src/__tests__/google-drive-api-mock.ts",
+            "packages/provider-dropbox/src/dropbox-provider.ts",
+            "packages/provider-dropbox/src/__tests__/dropbox-api-mock.ts",
+            "packages/provider-onedrive/src/onedrive-provider.ts",
+            "packages/provider-onedrive/src/__tests__/onedrive-api-mock.ts",
+            "packages/provider-icloud/src/cloudkit-client.ts",
+            "packages/provider-icloud/src/__tests__/icloud-api-mock.ts"
+          ],
+          "implementation_notes": "- Truncation evidence: google-drive-provider.ts:93-104, dropbox-provider.ts:108-130, onedrive-provider.ts:96-106, cloudkit-client.ts:105-114.\n- Silent listDocuments truncation is a contract-suite scenario from 01-01; Dropbox findFileByName duplicate-create corruption is the reproduced impact.\n- CloudKit continuation shape follows the D3-injected client interface (03-05 keeps it).\nTEST PARADIGM (mandatory): Unit tests for this step MUST be written as property-based tests using Hypothesis @given strategies + state-delta matchers (assert_state_delta over a declared universe with strict=True). Single-example unit tests are FALLBACK only — document why in a `# bypass:` comment if used. Acceptance scenarios MUST be framed as Property: blocks (quantified preconditions + invariant outcomes) where the contract supports it; classic Scenario: is fallback. Integration and E2E tests REMAIN single-example — they verify wiring, not invariants. Universe declaration is mandatory even when only one slot is checked: the unchanged() predicate covers the rest.",
+          "dependencies": [
+            "01-01"
+          ],
+          "estimated_effort": "6h",
+          "test_file": "",
+          "scenario_name": ""
+        },
+        {
+          "id": "02-04",
+          "name": "Local provider disconnect semantics",
+          "description": "LocalDocumentStoreProvider keeps persisted data across disconnect; pre-connect data operations reject NotConnectedError per the contract policy; provider passes the shared contract suite unmodified.",
+          "criteria": [
+            "disconnect preserves all previously written documents; reconnect observes identical state.",
+            "Data operations before connect reject with NotConnectedError, matching the contract policy from 01-01.",
+            "Local provider passes the full shared contract suite as an unmodified participant."
+          ],
+          "files_to_modify": [
+            "packages/core/src/providers/local-document-store-provider.ts"
+          ],
+          "implementation_notes": "- Spec violation: disconnect wipes storage (local-document-store-provider.ts:22-26) against local spec :51 and :115.\n- First provider to run through the expanded 01-01 suite; validates the suite itself before the remote providers land.\nTEST PARADIGM (mandatory): Unit tests for this step MUST be written as property-based tests using Hypothesis @given strategies + state-delta matchers (assert_state_delta over a declared universe with strict=True). Single-example unit tests are FALLBACK only — document why in a `# bypass:` comment if used. Acceptance scenarios MUST be framed as Property: blocks (quantified preconditions + invariant outcomes) where the contract supports it; classic Scenario: is fallback. Integration and E2E tests REMAIN single-example — they verify wiring, not invariants. Universe declaration is mandatory even when only one slot is checked: the unchanged() predicate covers the rest.",
+          "dependencies": [
+            "01-01"
+          ],
+          "estimated_effort": "3h",
+          "test_file": "",
+          "scenario_name": ""
+        },
+        {
+          "id": "02-05",
+          "name": "ConflictError carries the logical key",
+          "description": "ConflictError raised by all three file-backed providers exposes the logical key the caller used, never the encoded remote filename; the 01-01 contract assertion enforces it.",
+          "criteria": [
+            "For any conflicting key, ConflictError exposes exactly the caller's logical key on all three file-backed providers.",
+            "Keys with separators or unicode round-trip through conflict payloads with no encoding visible to callers.",
+            "The 01-01 contract assertion for conflict payload identity passes on Drive, Dropbox, and OneDrive."
+          ],
+          "files_to_modify": [
+            "packages/provider-google-drive/src/google-drive-provider.ts",
+            "packages/provider-dropbox/src/dropbox-provider.ts",
+            "packages/provider-onedrive/src/onedrive-provider.ts"
+          ],
+          "implementation_notes": "- Filename leak evidence: google-drive-provider.ts:70, dropbox-provider.ts:73, onedrive-provider.ts:78 (encoded names surface in error payloads).\n- Assertion already added in 01-01; this step makes the providers satisfy it.\n- Core ConflictError already accepts a key; no core change expected.\nTEST PARADIGM (mandatory): Unit tests for this step MUST be written as property-based tests using Hypothesis @given strategies + state-delta matchers (assert_state_delta over a declared universe with strict=True). Single-example unit tests are FALLBACK only — document why in a `# bypass:` comment if used. Acceptance scenarios MUST be framed as Property: blocks (quantified preconditions + invariant outcomes) where the contract supports it; classic Scenario: is fallback. Integration and E2E tests REMAIN single-example — they verify wiring, not invariants. Universe declaration is mandatory even when only one slot is checked: the unchanged() predicate covers the rest.",
+          "dependencies": [
+            "01-01"
+          ],
+          "estimated_effort": "3h",
+          "test_file": "",
+          "scenario_name": ""
+        },
+        {
+          "id": "02-06",
+          "name": "Error-model hardening",
+          "description": "Corrupted remote payloads surface as coded SettingsStoreError with cause instead of raw SyntaxError; token-endpoint transport failures are distinguishable from genuine 401/403 auth failures; DocumentNotFoundError is removed as dead taxonomy.",
+          "criteria": [
+            "Malformed remote payloads reject with coded SettingsStoreError whose cause chains the underlying parse failure.",
+            "Token-endpoint network failures are distinguishable from genuine 401/403 responses; only the latter request re-authentication.",
+            "DocumentNotFoundError is removed from the taxonomy; no provider or store can emit it afterwards.",
+            "Wrapped provider failures always populate cause."
+          ],
+          "files_to_modify": [
+            "packages/core/src/errors.ts",
+            "packages/core/src/providers/file-backed-document-provider.ts",
+            "packages/core/src/providers/record-backed-document-provider.ts",
+            "packages/provider-google-drive/src/google-drive-provider.ts",
+            "packages/provider-dropbox/src/dropbox-provider.ts",
+            "packages/provider-onedrive/src/onedrive-provider.ts",
+            "packages/provider-icloud/src/cloudkit-client.ts",
+            "packages/auth-web/src/oauth-client.ts",
+            "packages/auth-react-native/src/oauth-client.ts"
+          ],
+          "implementation_notes": "- DocumentNotFoundError decision (architect, 2026-10-12): grep shows zero throw sites — defined and unit-tested only. Removed, not specified (YAGNI); errors.test.ts updated accordingly; 04-02 drops it from docs.\n- Raw SyntaxError leaks and auth-failure conflation called out by the correctness review; providers populate cause on every wrap.\nTEST PARADIGM (mandatory): Unit tests for this step MUST be written as property-based tests using Hypothesis @given strategies + state-delta matchers (assert_state_delta over a declared universe with strict=True). Single-example unit tests are FALLBACK only — document why in a `# bypass:` comment if used. Acceptance scenarios MUST be framed as Property: blocks (quantified preconditions + invariant outcomes) where the contract supports it; classic Scenario: is fallback. Integration and E2E tests REMAIN single-example — they verify wiring, not invariants. Universe declaration is mandatory even when only one slot is checked: the unchanged() predicate covers the rest.",
+          "dependencies": [
+            "01-01"
+          ],
+          "estimated_effort": "5h",
+          "test_file": "",
+          "scenario_name": ""
+        },
+        {
+          "id": "02-07",
+          "name": "React Native secure default token store",
+          "description": "auth-react-native defaults to SecureTokenStore via dynamic expo-secure-store import when present; when no viable store resolves, construction rejects once with an accurate, actionable message.",
+          "criteria": [
+            "On runtimes resolving expo-secure-store, default clients persist tokens in the secure store with zero consumer configuration.",
+            "When no viable store resolves, construction rejects once with a message naming the missing capability and remediation.",
+            "No runtime silently falls back to plaintext token persistence."
+          ],
+          "files_to_modify": [
+            "packages/auth-react-native/src/oauth-client.ts",
+            "packages/auth-react-native/src/secure-token-store.ts",
+            "packages/auth-react-native/src/index.ts"
+          ],
+          "implementation_notes": "- Current behavior throws unconditionally at client construction (oauth-client.ts:158-163), forcing every consumer to wire a store manually.\n- Dynamic import keeps expo-secure-store optional at package level (peer-style softness) while the secure default holds where the module exists.\nTEST PARADIGM (mandatory): Unit tests for this step MUST be written as property-based tests using Hypothesis @given strategies + state-delta matchers (assert_state_delta over a declared universe with strict=True). Single-example unit tests are FALLBACK only — document why in a `# bypass:` comment if used. Acceptance scenarios MUST be framed as Property: blocks (quantified preconditions + invariant outcomes) where the contract supports it; classic Scenario: is fallback. Integration and E2E tests REMAIN single-example — they verify wiring, not invariants. Universe declaration is mandatory even when only one slot is checked: the unchanged() predicate covers the rest.",
+          "dependencies": [
+            "01-01"
+          ],
+          "estimated_effort": "3h",
+          "test_file": "",
+          "scenario_name": ""
+        },
+        {
+          "id": "02-08",
+          "name": "iCloud provider honesty",
+          "description": "iCloud provider reports real connection state through connect/disconnect/isConnected and returns a profile identifying only the provider; contract-test monkey-patching is deleted so the unmodified class passes the shared suite.",
+          "criteria": [
+            "Connection state reflects lifecycle truth: false before connect, true after connect, false after disconnect.",
+            "Profile resolution contains exactly {provider:'icloud'} with no fabricated account, email, or display name.",
+            "icloud contract tests import the unmodified provider class; monkey-patching deleted; suite passes."
+          ],
+          "files_to_modify": [
+            "packages/provider-icloud/src/icloud-provider.ts",
+            "packages/provider-icloud/src/__tests__/icloud-contract.test.ts"
+          ],
+          "implementation_notes": "- Contract violations: hardcoded/false state and fabricated profile (icloud-provider.ts:29-49) masked by monkey-patched tests (icloud-contract.test.ts:17-28).\n- 01-01 removed the monkey-patch machinery; this step makes the honest class pass the unskipped iCloud scenarios.\n- Prerequisite for 03-05, which rebuilds the transport beneath this now-honest class.\nTEST PARADIGM (mandatory): Unit tests for this step MUST be written as property-based tests using Hypothesis @given strategies + state-delta matchers (assert_state_delta over a declared universe with strict=True). Single-example unit tests are FALLBACK only — document why in a `# bypass:` comment if used. Acceptance scenarios MUST be framed as Property: blocks (quantified preconditions + invariant outcomes) where the contract supports it; classic Scenario: is fallback. Integration and E2E tests REMAIN single-example — they verify wiring, not invariants. Universe declaration is mandatory even when only one slot is checked: the unchanged() predicate covers the rest.",
+          "dependencies": [
+            "01-01"
+          ],
+          "estimated_effort": "3h",
+          "test_file": "",
+          "scenario_name": ""
+        }
+      ],
+      "implementation_scope": [
+        "packages/core/src/**",
+        "packages/provider-google-drive/src/**",
+        "packages/provider-dropbox/src/**",
+        "packages/provider-onedrive/src/**",
+        "packages/provider-icloud/src/**",
+        "packages/auth-react-native/src/**",
+        "packages/auth-web/src/oauth-client.ts"
+      ]
+    },
+    {
+      "id": "03",
+      "name": "Auth and iCloud Conformance",
+      "steps": [
+        {
+          "id": "03-01",
+          "name": "In-memory default token store (D1)",
+          "description": "auth-web defaults to an in-memory token store with silent re-auth; the web-storage store remains as explicit documented opt-in; threat-model section explains the XSS trade-off.",
+          "criteria": [
+            "Default configuration persists no token in localStorage, sessionStorage, or cookies.",
+            "Web-storage persistence is available only via explicit opt-in and documented with its threat model.",
+            "After reload, in-memory sessions re-authenticate silently instead of surfacing hard failures."
+          ],
+          "files_to_modify": [
+            "packages/auth-web/src/token-store.ts",
+            "packages/auth-web/src/oauth-client.ts",
+            "packages/auth-web/src/index.ts",
+            "packages/auth-web/README.md"
+          ],
+          "implementation_notes": "- D1 (decisions.md): XSS must not exfiltrate long-lived refresh tokens by default; silent re-auth replaces persistence.\n- Current default writes refresh tokens to localStorage (token-store.ts:9-33, oauth-client.ts:24) — becomes the opt-in LocalStorageTokenStore with threat-model docs.\n- Depends on 03-04: silent re-auth rides the robustified OAuth client.\nTEST PARADIGM (mandatory): Unit tests for this step MUST be written as property-based tests using Hypothesis @given strategies + state-delta matchers (assert_state_delta over a declared universe with strict=True). Single-example unit tests are FALLBACK only — document why in a `# bypass:` comment if used. Acceptance scenarios MUST be framed as Property: blocks (quantified preconditions + invariant outcomes) where the contract supports it; classic Scenario: is fallback. Integration and E2E tests REMAIN single-example — they verify wiring, not invariants. Universe declaration is mandatory even when only one slot is checked: the unchanged() predicate covers the rest.",
+          "dependencies": [
+            "03-04"
+          ],
+          "estimated_effort": "4h",
+          "test_file": "",
+          "scenario_name": ""
+        },
+        {
+          "id": "03-02",
+          "name": "OAuth port relocated to core (D4)",
+          "description": "OAuthClient and OAuthTokens port and config types move into @storage-bridge/core; both auth packages implement the core port; provider auth-web peerDependencies are dropped; both auth packages become publishable.",
+          "criteria": [
+            "@storage-bridge/core exports the OAuth client/tokens port and config types; both auth packages implement them.",
+            "No provider manifest declares an auth-web peerDependency afterwards.",
+            "auth-web and auth-react-native are publishable (not private).",
+            "All provider packages typecheck against the relocated port."
+          ],
+          "files_to_modify": [
+            "packages/core/src/oauth.ts",
+            "packages/core/src/index.ts",
+            "packages/auth-web/src/oauth-client.ts",
+            "packages/auth-web/src/types.ts",
+            "packages/auth-web/src/index.ts",
+            "packages/auth-web/package.json",
+            "packages/auth-react-native/src/oauth-client.ts",
+            "packages/auth-react-native/src/types.ts",
+            "packages/auth-react-native/src/index.ts",
+            "packages/auth-react-native/package.json",
+            "packages/provider-google-drive/package.json",
+            "packages/provider-dropbox/package.json",
+            "packages/provider-onedrive/package.json",
+            "packages/provider-icloud/package.json"
+          ],
+          "implementation_notes": "- D4 (decisions.md): publishable packages cannot peer-depend on private ones; auth-react-native depending on the browser package is a layering error — the port belongs to core.\n- Publishing contradiction evidence: provider-*/package.json:23-25 vs private flags in auth-web/package.json:4 and auth-react-native/package.json:4.\n- Depends on 02-06: both steps edit both OAuth clients; error-model lands first.\nTEST PARADIGM (mandatory): Unit tests for this step MUST be written as property-based tests using Hypothesis @given strategies + state-delta matchers (assert_state_delta over a declared universe with strict=True). Single-example unit tests are FALLBACK only — document why in a `# bypass:` comment if used. Acceptance scenarios MUST be framed as Property: blocks (quantified preconditions + invariant outcomes) where the contract supports it; classic Scenario: is fallback. Integration and E2E tests REMAIN single-example — they verify wiring, not invariants. Universe declaration is mandatory even when only one slot is checked: the unchanged() predicate covers the rest.",
+          "dependencies": [
+            "02-06"
+          ],
+          "estimated_effort": "6h",
+          "test_file": "",
+          "scenario_name": ""
+        },
+        {
+          "id": "03-03",
+          "name": "Shared TokenManager extraction",
+          "description": "Extract the ~90%-duplicated token lifecycle logic from the auth-web and auth-react-native OAuth clients into one shared TokenManager parameterized by token store and fetch; both clients become thin login adapters.",
+          "criteria": [
+            "One shared token-lifecycle implementation serves both runtimes; duplicated refresh/persist logic is gone.",
+            "Token store and fetch are injection points; the runtimes differ only in supplied adapters.",
+            "Behavior parity across runtimes holds under shared property tests on the common implementation."
+          ],
+          "files_to_modify": [
+            "packages/core/src/oauth.ts",
+            "packages/core/src/index.ts",
+            "packages/auth-web/src/oauth-client.ts",
+            "packages/auth-react-native/src/oauth-client.ts"
+          ],
+          "implementation_notes": "- Duplication evidence: auth-web oauth-client.ts:101-166 vs auth-react-native oauth-client.ts:95-156 (~90% identical refresh/persist flow).\n- TokenManager lives in core next to the D4 port; both clients shrink to runtime login plumbing.\nTEST PARADIGM (mandatory): Unit tests for this step MUST be written as property-based tests using Hypothesis @given strategies + state-delta matchers (assert_state_delta over a declared universe with strict=True). Single-example unit tests are FALLBACK only — document why in a `# bypass:` comment if used. Acceptance scenarios MUST be framed as Property: blocks (quantified preconditions + invariant outcomes) where the contract supports it; classic Scenario: is fallback. Integration and E2E tests REMAIN single-example — they verify wiring, not invariants. Universe declaration is mandatory even when only one slot is checked: the unchanged() predicate covers the rest.",
+          "dependencies": [
+            "03-02"
+          ],
+          "estimated_effort": "5h",
+          "test_file": "",
+          "scenario_name": ""
+        },
+        {
+          "id": "03-04",
+          "name": "OAuth robustness hardening",
+          "description": "Single-flight refresh caches the in-flight promise so concurrent callers await one rotation; callback handling surfaces provider errors as a discriminated result; pending state validates providerId and creation-time expiry.",
+          "criteria": [
+            "Concurrent refreshes during rotation share one in-flight request; no duplicate refresh calls and no spurious logout.",
+            "Callback handling resolves a discriminated result distinguishing success from provider error; error_description is preserved.",
+            "Pending state is rejected on providerId mismatch or expiry; stale-state replay cannot complete login."
+          ],
+          "files_to_modify": [
+            "packages/core/src/oauth.ts",
+            "packages/auth-web/src/oauth-client.ts",
+            "packages/auth-web/src/redirect-handler.ts",
+            "packages/auth-react-native/src/oauth-client.ts",
+            "packages/auth-react-native/src/deep-link-handler.ts"
+          ],
+          "implementation_notes": "- Review evidence: spurious logouts under token rotation (concurrent refreshes race); access_denied currently surfaces as opaque failure; pending state lacks providerId/expiry validation.\n- Implemented once in the shared manager (03-03) so both runtimes inherit it.\nTEST PARADIGM (mandatory): Unit tests for this step MUST be written as property-based tests using Hypothesis @given strategies + state-delta matchers (assert_state_delta over a declared universe with strict=True). Single-example unit tests are FALLBACK only — document why in a `# bypass:` comment if used. Acceptance scenarios MUST be framed as Property: blocks (quantified preconditions + invariant outcomes) where the contract supports it; classic Scenario: is fallback. Integration and E2E tests REMAIN single-example — they verify wiring, not invariants. Universe declaration is mandatory even when only one slot is checked: the unchanged() predicate covers the rest.",
+          "dependencies": [
+            "03-03"
+          ],
+          "estimated_effort": "5h",
+          "test_file": "",
+          "scenario_name": ""
+        },
+        {
+          "id": "03-05",
+          "name": "CloudKit spec-conformant client (D3)",
+          "description": "Restore the spec's injected CloudKitClient interface; CloudKit JS implementation owns Apple web sign-in; errors map to SettingsStoreError including AuthRequiredError on auth failures; recordType configurable; JSON envelope serialized into a string record field.",
+          "criteria": [
+            "Provider consumes an injected client exposing setUp, tearDown, isAuthenticated, fetchRecord, saveRecord, deleteRecord, queryRecords per the approved spec.",
+            "CloudKit JS implementation performs Apple web sign-in; 401/403/AUTHENTICATION_REQUIRED map to AuthRequiredError; other failures wrap SettingsStoreError with cause.",
+            "recordType is configurable with the spec default; isAppleRuntime() gates provider support.",
+            "Document payload serializes as JSON into a single string record field and round-trips losslessly.",
+            "Real-API integration verification is marked operator-blocked pending Apple web-auth-token provisioning."
+          ],
+          "files_to_modify": [
+            "packages/provider-icloud/src/cloudkit-client.ts",
+            "packages/provider-icloud/src/cloudkit-js-client.ts",
+            "packages/provider-icloud/src/record-mapper.ts",
+            "packages/provider-icloud/src/icloud-provider.ts",
+            "packages/provider-icloud/src/__tests__/icloud-api-mock.ts",
+            "packages/provider-icloud/src/index.ts"
+          ],
+          "implementation_notes": "- D3 (decisions.md): REST + API-token-only cannot reach the private database; spec docs/superpowers/specs/2026-04-15-icloud-provider-design.md §2/§7 (interface lines 121-142, recordType 75-77, mapper 243-252, provider 287-301) already approved this shape.\n- Divergence evidence: cloudkit-client.ts:28,39,56,79,101,108, record-mapper.ts:41.\n- JSON-in-string-field survives CloudKit's typed-field lossiness; string-envelope property covers it.\nTEST PARADIGM (mandatory): Unit tests for this step MUST be written as property-based tests using Hypothesis @given strategies + state-delta matchers (assert_state_delta over a declared universe with strict=True). Single-example unit tests are FALLBACK only — document why in a `# bypass:` comment if used. Acceptance scenarios MUST be framed as Property: blocks (quantified preconditions + invariant outcomes) where the contract supports it; classic Scenario: is fallback. Integration and E2E tests REMAIN single-example — they verify wiring, not invariants. Universe declaration is mandatory even when only one slot is checked: the unchanged() predicate covers the rest.",
+          "dependencies": [
+            "02-02",
+            "02-03",
+            "02-08"
+          ],
+          "estimated_effort": "8h",
+          "test_file": "",
+          "scenario_name": ""
+        }
+      ],
+      "implementation_scope": [
+        "packages/core/src/oauth.ts",
+        "packages/core/src/index.ts",
+        "packages/auth-web/src/**",
+        "packages/auth-react-native/src/**",
+        "packages/provider-icloud/src/**",
+        "packages/*/package.json"
+      ]
+    },
+    {
+      "id": "04",
+      "name": "Release Readiness",
+      "steps": [
+        {
+          "id": "04-01",
+          "name": "Release engineering (D5)",
+          "description": "Changesets-based releases with per-package publishing metadata; dist excludes tests; ESM-only exports drop the default condition; provenance-enabled publishing; build-config packages stay private.",
+          "criteria": [
+            "Every publishable package declares files, license, repository, description, publishConfig, sideEffects false; dist excludes src/__tests__.",
+            "Export conditions contain only import; README documents ESM-only support.",
+            "Changesets configured; publishing uses --provenance; eslint-config and typescript-config remain private or portable.",
+            "Dry-run publish emits ESM-only artifacts containing no test files for each publishable package."
+          ],
+          "files_to_modify": [
+            "package.json",
+            ".changeset/config.json",
+            "README.md",
+            "packages/core/package.json",
+            "packages/testing/package.json",
+            "packages/provider-google-drive/package.json",
+            "packages/provider-dropbox/package.json",
+            "packages/provider-onedrive/package.json",
+            "packages/provider-icloud/package.json",
+            "packages/auth-web/package.json",
+            "packages/auth-react-native/package.json",
+            "packages/eslint-config/package.json",
+            "packages/typescript-config/package.json"
+          ],
+          "implementation_notes": "- D5 (decisions.md): ESM-only; drop the ambiguous default export condition; audience is browser/RN/Metro.\n- Publishing contradiction resolved by 03-02 first (un-private + drop peerDeps); this step makes the manifests actually publishable.\n- Known defects fixed here: dist contains __tests__; typescript-config/base.json:2 breaks when published.\nEXEMPT FROM PARADIGM: packaging-config-only deliverable, no application code ships in this step. Compensate with property-based test at unit level on adjacent slot 03-05. STRUCTURAL VERIFICATION (mandatory): verify the deliverable structurally (manifests parse, dry-run publish executes) gated in CI.",
+          "dependencies": [
+            "01-03",
+            "03-02"
+          ],
+          "estimated_effort": "6h",
+          "test_file": "",
+          "scenario_name": ""
+        },
+        {
+          "id": "04-02",
+          "name": "Architecture documentation refresh",
+          "description": "Rewrite docs/settings-store-architecture.md to match shipped reality: accurate file tree, fixed mojibake, shipped error codes, post-D2 revision/changeTag semantics, D1 auth threat model, two-phase browser flow, registry reality.",
+          "criteria": [
+            "Documented file tree matches the repository exactly; phantom paths and encoding artifacts removed.",
+            "All shipped error codes documented; revision/changeTag semantics match D2 behavior.",
+            "Auth sections document the D1 threat model and the two-phase browser flow as implemented.",
+            "ProviderRegistry and createSettingsStore documentation match the exported API surface."
+          ],
+          "files_to_modify": [
+            "docs/settings-store-architecture.md"
+          ],
+          "implementation_notes": "- Removes the phantom provider-local/*-auth.ts tree and mojibake; documents shipped codes beyond the original 7-code taxonomy (post-02-06 state, minus removed DOCUMENT_NOT_FOUND).\n- Documents Drive best-effort concurrency per D2 and the D3 injected-client shape with the operator-side web-auth-token caveat.\nEXEMPT FROM PARADIGM: documentation-only deliverable, no application code ships in this step. Compensate with property-based test at unit level on adjacent slot 03-05. STRUCTURAL VERIFICATION (mandatory): verify the deliverable structurally (every referenced file path exists, headings well-formed) gated in CI.",
+          "dependencies": [
+            "02-02",
+            "02-06",
+            "03-01",
+            "03-05"
+          ],
+          "estimated_effort": "4h",
+          "test_file": "",
+          "scenario_name": ""
+        },
+        {
+          "id": "04-03",
+          "name": "Tooling hygiene pass",
+          "description": "Pin latest specifiers to caret ranges; turbo typecheck builds dependencies first and dead dev task removed; formatter plus consistent-type-imports enforced; tsconfig layering deduplicated; per-package README stubs added.",
+          "criteria": [
+            "No `latest` specifiers remain; all dependencies use caret ranges.",
+            "turbo typecheck dependsOn ^build; dead dev task removed.",
+            "Formatter and consistent-type-imports enforced; `pnpm lint` remains green.",
+            "Shared tsconfig layering referenced everywhere; no duplicated compiler options across packages.",
+            "Every package ships a README stub with install and minimal usage."
+          ],
+          "files_to_modify": [
+            "package.json",
+            "turbo.json",
+            "packages/typescript-config/base.json",
+            "packages/typescript-config/package.json",
+            "packages/eslint-config/index.js",
+            "packages/eslint-config/package.json",
+            "packages/core/README.md",
+            "packages/testing/README.md",
+            "packages/provider-google-drive/README.md",
+            "packages/provider-dropbox/README.md",
+            "packages/provider-onedrive/README.md",
+            "packages/provider-icloud/README.md",
+            "packages/auth-web/README.md",
+            "packages/auth-react-native/README.md"
+          ],
+          "implementation_notes": "- Root devDependencies currently `latest` (package.json:16-17); eslint-config peers likewise — pin to ^.\n- typecheck without ^build makes cross-package type checks order-dependent; dev task has no consumer.\nEXEMPT FROM PARADIGM: tooling-config-only deliverable, no application code ships in this step. Compensate with property-based test at unit level on adjacent slot 03-05. STRUCTURAL VERIFICATION (mandatory): verify the deliverable structurally (configs parse, lint executes, typecheck graph builds) gated in CI.",
+          "dependencies": [
+            "04-01"
+          ],
+          "estimated_effort": "4h",
+          "test_file": "",
+          "scenario_name": ""
+        }
+      ],
+      "implementation_scope": [
+        "package.json",
+        "packages/*/package.json",
+        "packages/typescript-config/**",
+        "packages/eslint-config/**",
+        "turbo.json",
+        ".changeset/**",
+        "docs/settings-store-architecture.md",
+        "README.md",
+        "packages/*/README.md"
+      ]
+    }
+  ],
+  "validation": {
+    "commands": [
+      "pnpm typecheck",
+      "pnpm lint",
+      "pnpm build",
+      "pnpm test"
+    ],
+    "notes": "Staged gate (enforceable at every step): from 01-01, pnpm typecheck and pnpm test exit 0 with existing scenarios green — new target-behavior scenarios may run red only as declared skipped/expected-failure scaffolds until their owning remediation step unskips them; from 01-02, pnpm lint additionally exits 0; from 01-03 onward and after the full roadmap, all four commands (typecheck, lint, build, test) exit 0. Stack note (stated once): the TypeScript/vitest stack has no Hypothesis equivalent — fast-check property tests plus explicit state-delta assertions are the accepted substitute; the verbatim per-step directive still applies with that substitution, and the bypass comment marker is // (TypeScript), not #. Mutation: nightly-delta strategy — kill-rate gate runs in the CI nightly pipeline (CI lands at 01-03), not per-step. DISTILL was skipped, so the crafter authors new tests per step and writes scenario names then.",
+    "review": {
+      "reviewer": "nw-acceptance-designer-reviewer",
+      "date": "2026-10-12",
+      "verdict": "APPROVED",
+      "summary": "Cycle 1: all three blockers resolved and verified in-file (01-01 scaffold-red gate with per-step unskip ownership, staged validation gate with // bypass marker and nightly mutation deferral, 03-05 deps now 02-02/02-03/02-08); D2 missing-key elaboration documented in decisions.md; no new issues — one non-blocking nitpick: 01-01 unskip-owner list omits 02-06 for the error-taxonomy scenario family."
+    }
+  }
+}

@@ -409,8 +409,9 @@ chained, never leaked as a bare `SyntaxError` or fetch error).
   callback-consumption time (provider match + freshness; a future-dated or
   non-finite `createdAt` is rejected).
 - `requireTokenEndpointSuccess(response, providerId)` - the response
-  classifier above. `@storage-bridge/auth-web` re-exports it for backward
-  compatibility.
+  classifier above, exported from `@storage-bridge/core`'s `oauth.ts`
+  module. The former `@storage-bridge/auth-web` re-export was removed by
+  the phase-3 refactor (it had zero importers).
 
 ### Web: two-phase browser flow (`@storage-bridge/auth-web`)
 
