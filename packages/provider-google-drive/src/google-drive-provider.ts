@@ -4,8 +4,6 @@ import {
   type FileEntry,
   type PutOptions,
   ConflictError,
-  AuthRequiredError,
-  SettingsStoreError,
 } from '@storage-bridge/core';
 import { toFileEntry, type GoogleDriveFileRaw } from './google-drive-mapper.js';
 
@@ -62,10 +60,10 @@ export class GoogleDriveProvider extends FileBackedDocumentProvider {
   async getProfile() {
     const tokens = await this.auth.getTokens();
     if (!tokens) return null;
-    return { provider: 'google-drive' as const };
+    return { provider: this.id };
   }
 
-  public async readFile(fileName: string): Promise<{ text: string; meta: FileEntry } | null> {
+  protected async readFile(fileName: string): Promise<{ text: string; meta: FileEntry } | null> {
     const file = await this.findFileByName(fileName);
     if (!file) return null;
 
@@ -74,14 +72,16 @@ export class GoogleDriveProvider extends FileBackedDocumentProvider {
     });
 
     if (res.status === 404) return null;
-    if (res.status === 401 || res.status === 403) throw new AuthRequiredError(this.id);
-    if (!res.ok)
-      throw new SettingsStoreError(`Drive read failed: ${res.status}`, 'DRIVE_READ_ERROR');
+    this.requireTransportSuccess(res, 'Drive read failed', 'DRIVE_READ_ERROR');
 
     return { text: await res.text(), meta: file };
   }
 
-  public async writeFile(fileName: string, body: string, options?: PutOptions): Promise<FileEntry> {
+  protected async writeFile(
+    fileName: string,
+    body: string,
+    options?: PutOptions,
+  ): Promise<FileEntry> {
     const existing = await this.findFileByName(fileName);
 
     // Best-effort concurrency (D2): Drive v3 media PATCH has no server-side
@@ -99,7 +99,7 @@ export class GoogleDriveProvider extends FileBackedDocumentProvider {
     return existing ? this.updateFile(existing.id, body) : this.createFile(fileName, body);
   }
 
-  public async removeFile(fileName: string): Promise<void> {
+  protected async removeFile(fileName: string): Promise<void> {
     const file = await this.findFileByName(fileName);
     if (!file) return;
 
@@ -109,12 +109,10 @@ export class GoogleDriveProvider extends FileBackedDocumentProvider {
     });
 
     if (res.status === 404) return;
-    if (res.status === 401 || res.status === 403) throw new AuthRequiredError(this.id);
-    if (!res.ok)
-      throw new SettingsStoreError(`Drive delete failed: ${res.status}`, 'DRIVE_DELETE_ERROR');
+    this.requireTransportSuccess(res, 'Drive delete failed', 'DRIVE_DELETE_ERROR');
   }
 
-  public async listFiles(): Promise<FileEntry[]> {
+  protected async listFiles(): Promise<FileEntry[]> {
     const files: FileEntry[] = [];
     let pageToken: string | undefined;
 
@@ -132,9 +130,7 @@ export class GoogleDriveProvider extends FileBackedDocumentProvider {
         headers: await this.auth.getAuthHeaders(),
       });
 
-      if (res.status === 401 || res.status === 403) throw new AuthRequiredError(this.id);
-      if (!res.ok)
-        throw new SettingsStoreError(`Drive list failed: ${res.status}`, 'DRIVE_LIST_ERROR');
+      this.requireTransportSuccess(res, 'Drive list failed', 'DRIVE_LIST_ERROR');
 
       const json = (await res.json()) as { files?: GoogleDriveFileRaw[]; nextPageToken?: string };
       files.push(
@@ -165,9 +161,7 @@ export class GoogleDriveProvider extends FileBackedDocumentProvider {
         headers: await this.auth.getAuthHeaders(),
       });
 
-      if (res.status === 401 || res.status === 403) throw new AuthRequiredError(this.id);
-      if (!res.ok)
-        throw new SettingsStoreError(`Drive query failed: ${res.status}`, 'DRIVE_QUERY_ERROR');
+      this.requireTransportSuccess(res, 'Drive query failed', 'DRIVE_QUERY_ERROR');
 
       const json = (await res.json()) as { files?: GoogleDriveFileRaw[]; nextPageToken?: string };
       files.push(...(json.files ?? []).map((f) => toFileEntry(f, (n) => this.fileNameToKey(n))));
@@ -196,9 +190,7 @@ export class GoogleDriveProvider extends FileBackedDocumentProvider {
       },
     );
 
-    if (res.status === 401 || res.status === 403) throw new AuthRequiredError(this.id);
-    if (!res.ok)
-      throw new SettingsStoreError(`Drive create failed: ${res.status}`, 'DRIVE_CREATE_ERROR');
+    this.requireTransportSuccess(res, 'Drive create failed', 'DRIVE_CREATE_ERROR');
 
     return toFileEntry((await res.json()) as GoogleDriveFileRaw, (n) => this.fileNameToKey(n));
   }
@@ -216,9 +208,7 @@ export class GoogleDriveProvider extends FileBackedDocumentProvider {
       },
     );
 
-    if (res.status === 401 || res.status === 403) throw new AuthRequiredError(this.id);
-    if (!res.ok)
-      throw new SettingsStoreError(`Drive update failed: ${res.status}`, 'DRIVE_UPDATE_ERROR');
+    this.requireTransportSuccess(res, 'Drive update failed', 'DRIVE_UPDATE_ERROR');
 
     return toFileEntry((await res.json()) as GoogleDriveFileRaw, (n) => this.fileNameToKey(n));
   }

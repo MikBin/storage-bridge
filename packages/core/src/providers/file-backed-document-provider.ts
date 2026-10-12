@@ -1,4 +1,4 @@
-import { NotConnectedError, SettingsStoreError } from '../errors.js';
+import { AuthRequiredError, NotConnectedError, SettingsStoreError } from '../errors.js';
 import type {
   DocumentStoreProvider,
   ProviderId,
@@ -68,6 +68,22 @@ export abstract class FileBackedDocumentProvider implements DocumentStoreProvide
   private async ensureConnected(): Promise<void> {
     if (!(await this.isConnected())) {
       throw new NotConnectedError();
+    }
+  }
+
+  /**
+   * Uniform transport-error classification (02-06): 401/403 reject with
+   * AuthRequiredError for this provider; any other non-ok response rejects
+   * with a coded SettingsStoreError whose message carries the operation
+   * label and the HTTP status. Provider-specific statuses (404 missing,
+   * 409/412 conflict) are handled by callers BEFORE this guard.
+   */
+  protected requireTransportSuccess(res: Response, message: string, code: string): void {
+    if (res.status === 401 || res.status === 403) {
+      throw new AuthRequiredError(this.id);
+    }
+    if (!res.ok) {
+      throw new SettingsStoreError(`${message}: ${res.status}`, code);
     }
   }
 

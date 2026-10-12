@@ -4,7 +4,6 @@ import {
   type FileEntry,
   type PutOptions,
   ConflictError,
-  AuthRequiredError,
   SettingsStoreError,
 } from '@storage-bridge/core';
 import { toFileEntry, type DropboxFileRaw } from './dropbox-mapper.js';
@@ -55,7 +54,7 @@ export class DropboxProvider extends FileBackedDocumentProvider {
     return { provider: this.id };
   }
 
-  public async readFile(fileName: string): Promise<{ text: string; meta: FileEntry } | null> {
+  protected async readFile(fileName: string): Promise<{ text: string; meta: FileEntry } | null> {
     const res = await this.fetchFn(`${CONTENT_BASE}/2/files/download`, {
       method: 'POST',
       headers: {
@@ -65,9 +64,7 @@ export class DropboxProvider extends FileBackedDocumentProvider {
     });
 
     if (res.status === 409) return null;
-    if (res.status === 401 || res.status === 403) throw new AuthRequiredError(this.id);
-    if (!res.ok)
-      throw new SettingsStoreError(`Dropbox read failed: ${res.status}`, 'DROPBOX_READ_ERROR');
+    this.requireTransportSuccess(res, 'Dropbox read failed', 'DROPBOX_READ_ERROR');
 
     const metaHeader = res.headers.get('Dropbox-API-Result') ?? '{}';
 
@@ -94,7 +91,11 @@ export class DropboxProvider extends FileBackedDocumentProvider {
     return { text: await res.text(), meta: toFileEntry(raw, (n) => this.fileNameToKey(n)) };
   }
 
-  public async writeFile(fileName: string, body: string, options?: PutOptions): Promise<FileEntry> {
+  protected async writeFile(
+    fileName: string,
+    body: string,
+    options?: PutOptions,
+  ): Promise<FileEntry> {
     const mode = resolveUploadMode(options);
 
     const res = await this.fetchFn(`${CONTENT_BASE}/2/files/upload`, {
@@ -109,14 +110,12 @@ export class DropboxProvider extends FileBackedDocumentProvider {
 
     // Payload is the caller's logical key, never the encoded remote name.
     if (res.status === 409) throw new ConflictError(this.fileNameToKey(fileName));
-    if (res.status === 401 || res.status === 403) throw new AuthRequiredError(this.id);
-    if (!res.ok)
-      throw new SettingsStoreError(`Dropbox write failed: ${res.status}`, 'DROPBOX_WRITE_ERROR');
+    this.requireTransportSuccess(res, 'Dropbox write failed', 'DROPBOX_WRITE_ERROR');
 
     return toFileEntry((await res.json()) as DropboxFileRaw, (n) => this.fileNameToKey(n));
   }
 
-  public async removeFile(fileName: string): Promise<void> {
+  protected async removeFile(fileName: string): Promise<void> {
     const res = await this.fetchFn(`${API_BASE}/2/files/delete_v2`, {
       method: 'POST',
       headers: {
@@ -127,12 +126,10 @@ export class DropboxProvider extends FileBackedDocumentProvider {
     });
 
     if (res.status === 409) return;
-    if (res.status === 401 || res.status === 403) throw new AuthRequiredError(this.id);
-    if (!res.ok)
-      throw new SettingsStoreError(`Dropbox delete failed: ${res.status}`, 'DROPBOX_DELETE_ERROR');
+    this.requireTransportSuccess(res, 'Dropbox delete failed', 'DROPBOX_DELETE_ERROR');
   }
 
-  public async listFiles(): Promise<FileEntry[]> {
+  protected async listFiles(): Promise<FileEntry[]> {
     const entries: FileEntry[] = [];
     let cursor: string | undefined;
 
@@ -155,9 +152,7 @@ export class DropboxProvider extends FileBackedDocumentProvider {
         },
       );
 
-      if (res.status === 401 || res.status === 403) throw new AuthRequiredError(this.id);
-      if (!res.ok)
-        throw new SettingsStoreError(`Dropbox list failed: ${res.status}`, 'DROPBOX_LIST_ERROR');
+      this.requireTransportSuccess(res, 'Dropbox list failed', 'DROPBOX_LIST_ERROR');
 
       const json = (await res.json()) as {
         entries?: DropboxFileRaw[];

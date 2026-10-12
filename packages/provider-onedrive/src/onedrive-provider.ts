@@ -4,7 +4,6 @@ import {
   type FileEntry,
   type PutOptions,
   ConflictError,
-  AuthRequiredError,
   SettingsStoreError,
 } from '@storage-bridge/core';
 import { toFileEntry, type OneDriveItemRaw } from './onedrive-mapper.js';
@@ -60,9 +59,7 @@ export class OneDriveProvider extends FileBackedDocumentProvider {
     });
 
     if (res.status === 404) return null;
-    if (res.status === 401 || res.status === 403) throw new AuthRequiredError(this.id);
-    if (!res.ok)
-      throw new SettingsStoreError(`OneDrive read failed: ${res.status}`, 'ONEDRIVE_READ_ERROR');
+    this.requireTransportSuccess(res, 'OneDrive read failed', 'ONEDRIVE_READ_ERROR');
 
     const meta = await this.getItemMetadata(fileName);
     return { text: await res.text(), meta };
@@ -93,9 +90,7 @@ export class OneDriveProvider extends FileBackedDocumentProvider {
 
     // Payload is the caller's logical key, never the encoded remote name.
     if (res.status === 412) throw new ConflictError(this.fileNameToKey(fileName));
-    if (res.status === 401 || res.status === 403) throw new AuthRequiredError(this.id);
-    if (!res.ok)
-      throw new SettingsStoreError(`OneDrive write failed: ${res.status}`, 'ONEDRIVE_WRITE_ERROR');
+    this.requireTransportSuccess(res, 'OneDrive write failed', 'ONEDRIVE_WRITE_ERROR');
 
     return toFileEntry((await res.json()) as OneDriveItemRaw, (n) => this.fileNameToKey(n));
   }
@@ -107,12 +102,7 @@ export class OneDriveProvider extends FileBackedDocumentProvider {
     });
 
     if (res.status === 404) return;
-    if (res.status === 401 || res.status === 403) throw new AuthRequiredError(this.id);
-    if (!res.ok)
-      throw new SettingsStoreError(
-        `OneDrive delete failed: ${res.status}`,
-        'ONEDRIVE_DELETE_ERROR',
-      );
+    this.requireTransportSuccess(res, 'OneDrive delete failed', 'ONEDRIVE_DELETE_ERROR');
   }
 
   protected async listFiles(): Promise<FileEntry[]> {
@@ -126,9 +116,7 @@ export class OneDriveProvider extends FileBackedDocumentProvider {
         headers: await this.auth.getAuthHeaders(),
       });
 
-      if (res.status === 401 || res.status === 403) throw new AuthRequiredError(this.id);
-      if (!res.ok)
-        throw new SettingsStoreError(`OneDrive list failed: ${res.status}`, 'ONEDRIVE_LIST_ERROR');
+      this.requireTransportSuccess(res, 'OneDrive list failed', 'ONEDRIVE_LIST_ERROR');
 
       const json = (await res.json()) as { value?: OneDriveItemRaw[]; '@odata.nextLink'?: string };
       items.push(...(json.value ?? []).map((v) => toFileEntry(v, (n) => this.fileNameToKey(n))));

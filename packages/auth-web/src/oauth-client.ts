@@ -7,10 +7,6 @@ import { generateCodeVerifier, generateCodeChallenge } from './pkce.js';
 import { savePendingState, consumePendingState } from './redirect-handler.js';
 import { AuthRequiredError } from '@storage-bridge/core';
 
-// Compat re-export: the token-endpoint response classifier moved to core
-// (03-03); the auth-web export surface is preserved for existing importers.
-export { requireTokenEndpointSuccess } from '@storage-bridge/core';
-
 export interface BrowserOAuthClientOptions {
   config: OAuthProviderConfig;
   /**

@@ -1,10 +1,9 @@
 import type { OAuthTokens } from './types.js';
+import type { TokenStore } from '@storage-bridge/core';
 
-export interface TokenStore {
-  get(providerId: string): OAuthTokens | null | Promise<OAuthTokens | null>;
-  set(providerId: string, tokens: OAuthTokens): void | Promise<void>;
-  remove(providerId: string): void | Promise<void>;
-}
+// The TokenStore port is owned by core (03-03); re-exported so the auth-web
+// surface keeps exposing it alongside the stores that implement it.
+export type { TokenStore };
 
 /**
  * Default token store (03-01 / D1): keeps tokens in instance memory only.
