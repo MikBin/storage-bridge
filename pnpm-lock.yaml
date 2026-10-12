@@ -20,9 +20,6 @@ importers:
 
   packages/auth-react-native:
     dependencies:
-      '@storage-bridge/auth-web':
-        specifier: workspace:*
-        version: link:../auth-web
       '@storage-bridge/core':
         specifier: workspace:*
         version: link:../core
@@ -101,9 +98,6 @@ importers:
         specifier: workspace:*
         version: link:../core
     devDependencies:
-      '@storage-bridge/auth-web':
-        specifier: workspace:*
-        version: link:../auth-web
       '@storage-bridge/eslint-config':
         specifier: workspace:*
         version: link:../eslint-config
@@ -126,9 +120,6 @@ importers:
         specifier: workspace:*
         version: link:../core
     devDependencies:
-      '@storage-bridge/auth-web':
-        specifier: workspace:*
-        version: link:../auth-web
       '@storage-bridge/eslint-config':
         specifier: workspace:*
         version: link:../eslint-config
@@ -173,9 +164,6 @@ importers:
         specifier: workspace:*
         version: link:../core
     devDependencies:
-      '@storage-bridge/auth-web':
-        specifier: workspace:*
-        version: link:../auth-web
       '@storage-bridge/eslint-config':
         specifier: workspace:*
         version: link:../eslint-config

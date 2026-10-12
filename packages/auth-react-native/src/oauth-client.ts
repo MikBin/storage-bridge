@@ -1,12 +1,10 @@
 import type { OAuthClient, OAuthTokens } from '@storage-bridge/core';
-import { requireTokenEndpointSuccess } from '@storage-bridge/auth-web';
+import { TokenManager } from '@storage-bridge/core';
 import type { ReactNativeOAuthConfig } from './types.js';
 import { AuthRequest } from 'expo-auth-session';
-import { AuthExchangeError, AuthRequiredError } from '@storage-bridge/core';
+import { AuthRequiredError } from '@storage-bridge/core';
 import { SecureTokenStore } from './secure-token-store.js';
 import type { SecureStoreModule } from './secure-token-store.js';
-
-const REFRESH_BUFFER_MS = 60_000;
 
 const NO_VIABLE_SECURE_STORE_MESSAGE =
   'No viable secure token store is available: the optional dependency expo-secure-store could not be resolved. ' +
@@ -65,10 +63,14 @@ export interface ReactNativeOAuthClientOptions {
   fetchFn?: typeof fetch;
 }
 
+/**
+ * React Native login adapter (03-03): owns the expo AuthRequest /
+ * deep-link flow and delegates the entire token lifecycle to the shared core
+ * TokenManager (the runtimes differ only in the adapters they inject).
+ */
 export class ReactNativeOAuthClient implements OAuthClient {
   private readonly config: ReactNativeOAuthConfig;
-  private readonly tokenStore: NativeTokenStore;
-  private readonly fetchFn: typeof fetch;
+  private readonly tokens: TokenManager;
 
   /**
    * Async construction entry point. An explicitly provided tokenStore always
@@ -86,26 +88,11 @@ export class ReactNativeOAuthClient implements OAuthClient {
     if (!options.tokenStore) {
       throw new Error(DIRECT_CONSTRUCTION_MESSAGE);
     }
-    this.tokenStore = options.tokenStore;
-    this.fetchFn = options.fetchFn ?? fetch;
-  }
-
-  /**
-   * Posts the token-endpoint form body, wrapping fetch transport failures
-   * (network errors) as AuthExchangeError with the original error as cause —
-   * a network failure is never an auth rejection (02-06). Shares the pure
-   * response classifier with the web client for the 03-03 TokenManager split.
-   */
-  private async postTokenForm(params: URLSearchParams): Promise<Response> {
-    try {
-      return await this.fetchFn(this.config.tokenEndpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: params.toString(),
-      });
-    } catch (error) {
-      throw new AuthExchangeError(this.config.providerId, error instanceof Error ? error : new Error(String(error)));
-    }
+    this.tokens = new TokenManager({
+      config: options.config,
+      tokenStore: options.tokenStore,
+      fetchFn: options.fetchFn,
+    });
   }
 
   async login(): Promise<void> {
@@ -130,104 +117,22 @@ export class ReactNativeOAuthClient implements OAuthClient {
       throw new AuthRequiredError(this.config.providerId);
     }
 
-    const tokenParams = new URLSearchParams({
-      grant_type: 'authorization_code',
-      code,
-      redirect_uri: this.config.redirectUri,
-      client_id: this.config.clientId,
-    });
-
-    if (request.codeVerifier) {
-      tokenParams.append('code_verifier', request.codeVerifier);
-    }
-
-    const response = await this.postTokenForm(tokenParams);
-    await requireTokenEndpointSuccess(response, this.config.providerId);
-
-    const json = await response.json() as {
-      access_token: string;
-      refresh_token?: string;
-      expires_in?: number;
-      token_type?: string;
-    };
-
-    const tokens: OAuthTokens = {
-      accessToken: json.access_token,
-      refreshToken: json.refresh_token,
-      expiresAt: json.expires_in ? Date.now() + json.expires_in * 1000 : undefined,
-      tokenType: (json.token_type as 'Bearer') ?? 'Bearer',
-    };
-
-    await this.tokenStore.set(this.config.providerId, tokens);
+    await this.tokens.exchangeAuthorizationCode(code, request.codeVerifier);
   }
 
-  async logout(): Promise<void> {
-    await this.tokenStore.remove(this.config.providerId);
+  logout(): Promise<void> {
+    return this.tokens.logout();
   }
 
-  async getAccessToken(): Promise<string> {
-    const tokens = await this.tokenStore.get(this.config.providerId);
-    if (!tokens) {
-      throw new AuthRequiredError(this.config.providerId);
-    }
-
-    if (tokens.expiresAt && tokens.expiresAt - Date.now() < REFRESH_BUFFER_MS) {
-      return this.refreshTokens(tokens);
-    }
-
-    return tokens.accessToken;
+  getAccessToken(): Promise<string> {
+    return this.tokens.getAccessToken();
   }
 
-  async getTokens(): Promise<OAuthTokens | null> {
-    return this.tokenStore.get(this.config.providerId);
+  getTokens(): Promise<OAuthTokens | null> {
+    return this.tokens.getTokens();
   }
 
-  async getAuthHeaders(): Promise<Record<string, string>> {
-    const token = await this.getAccessToken();
-    return { Authorization: `Bearer ${token}` };
-  }
-
-  private async refreshTokens(tokens: OAuthTokens): Promise<string> {
-    if (!tokens.refreshToken) {
-      await this.tokenStore.remove(this.config.providerId);
-      throw new AuthRequiredError(this.config.providerId);
-    }
-
-    const params = new URLSearchParams({
-      grant_type: 'refresh_token',
-      refresh_token: tokens.refreshToken,
-      client_id: this.config.clientId,
-    });
-
-    const response = await this.postTokenForm(params);
-
-    // Only a genuine auth rejection (400 invalid_grant / 401 / 403) kills the
-    // stored grant; transport and 5xx failures (AuthExchangeError) preserve it
-    // so the refresh can be retried (02-06).
-    try {
-      await requireTokenEndpointSuccess(response, this.config.providerId);
-    } catch (error) {
-      if (error instanceof AuthRequiredError) {
-        await this.tokenStore.remove(this.config.providerId);
-      }
-      throw error;
-    }
-
-    const json = await response.json() as {
-      access_token: string;
-      refresh_token?: string;
-      expires_in?: number;
-      token_type?: string;
-    };
-
-    const newTokens: OAuthTokens = {
-      accessToken: json.access_token,
-      refreshToken: json.refresh_token ?? tokens.refreshToken,
-      expiresAt: json.expires_in ? Date.now() + json.expires_in * 1000 : undefined,
-      tokenType: (json.token_type as 'Bearer') ?? 'Bearer',
-    };
-
-    await this.tokenStore.set(this.config.providerId, newTokens);
-    return newTokens.accessToken;
+  getAuthHeaders(): Promise<Record<string, string>> {
+    return this.tokens.getAuthHeaders();
   }
 }

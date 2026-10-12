@@ -18,8 +18,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@storage-bridge/core": "workspace:*",
-    "@storage-bridge/auth-web": "workspace:*"
+    "@storage-bridge/core": "workspace:*"
   },
   "peerDependencies": {
     "expo-auth-session": ">=5.0.0",
