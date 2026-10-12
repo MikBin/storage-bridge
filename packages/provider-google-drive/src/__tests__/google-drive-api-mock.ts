@@ -16,12 +16,43 @@ function generateId(): string {
   return `mock-file-${nextId++}`;
 }
 
+/**
+ * Emulates the Drive v3 q grammar for a `name='…'` string literal: the literal
+ * is single-quoted and a backslash escapes itself and the quote (`\\`, `\'`).
+ * Returns null when the query carries no name clause.
+ */
+function extractQueryNameLiteral(q: string): string | null {
+  const marker = "name='";
+  const start = q.indexOf(marker);
+  if (start === -1) return null;
+
+  let literal = '';
+  for (let i = start + marker.length; i < q.length; i += 1) {
+    const char = q[i];
+    if (char === '\\' && (q[i + 1] === "'" || q[i + 1] === '\\')) {
+      literal += q[i + 1];
+      i += 1;
+      continue;
+    }
+    if (char === "'") break;
+    literal += char;
+  }
+  return literal;
+}
+
 export function createDriveApiMock() {
   const files = new Map<string, MockFile>();
+  let queryFailureStatus: number | null = null;
 
   function reset(): void {
     files.clear();
     nextId = 1;
+    queryFailureStatus = null;
+  }
+
+  /** Arms a one-endpoint failure: the next files.list query (q param present) fails with `status` until cleared. */
+  function setQueryFailure(status: number | null): void {
+    queryFailureStatus = status;
   }
 
   const mockFetch = async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
@@ -36,11 +67,19 @@ export function createDriveApiMock() {
 
     if (path.endsWith('/files') && !path.includes('upload') && method === 'GET') {
       const q = url.searchParams.get('q') ?? '';
+
+      if (q !== '' && queryFailureStatus !== null) {
+        return new Response(JSON.stringify({ error: { code: queryFailureStatus } }), {
+          status: queryFailureStatus,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+
       let results = Array.from(files.values()).filter(f => !f.trashed);
 
-      const nameMatch = q.match(/name='([^']+)'/);
-      if (nameMatch) {
-        results = results.filter(f => f.name === nameMatch[1]);
+      const nameLiteral = extractQueryNameLiteral(q);
+      if (nameLiteral !== null) {
+        results = results.filter(f => f.name === nameLiteral);
       }
 
       const responseFiles: GoogleDriveFileRaw[] = results.map(f => ({
@@ -152,5 +191,5 @@ export function createDriveApiMock() {
     return new Response(JSON.stringify({ error: { code: 400 } }), { status: 400 });
   };
 
-  return { mockFetch, reset, files };
+  return { mockFetch, reset, setQueryFailure, files };
 }

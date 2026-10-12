@@ -12,6 +12,16 @@ import { toFileEntry, type GoogleDriveFileRaw } from './google-drive-mapper.js';
 const DRIVE_API_BASE = 'https://www.googleapis.com/drive/v3/files';
 const DRIVE_UPLOAD_BASE = 'https://www.googleapis.com/upload/drive/v3/files';
 
+/**
+ * Escapes a value for use inside a Drive v3 q string literal, where a
+ * backslash escapes itself and the closing quote (`\\` and `\'`). Without
+ * this, a filename containing `'` terminates the literal early and the query
+ * silently matches nothing.
+ */
+function escapeDriveQueryLiteral(value: string): string {
+  return value.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+}
+
 export interface GoogleDriveProviderOptions {
   auth: OAuthClient;
   fetchFn?: typeof fetch;
@@ -104,16 +114,18 @@ export class GoogleDriveProvider extends FileBackedDocumentProvider {
   }
 
   private async findFileByName(name: string): Promise<FileEntry | null> {
-    const query = encodeURIComponent(`name='${name}' and trashed=false`);
+    const query = encodeURIComponent(`name='${escapeDriveQueryLiteral(name)}' and trashed=false`);
     const res = await this.fetchFn(
       `${DRIVE_API_BASE}?spaces=appDataFolder&q=${query}&fields=files(id,name,mimeType,size,modifiedTime,version)`,
       { headers: await this.auth.getAuthHeaders() },
     );
-    if (!res.ok) return null;
+
+    if (res.status === 401 || res.status === 403) throw new AuthRequiredError(this.id);
+    if (!res.ok) throw new SettingsStoreError(`Drive query failed: ${res.status}`, 'DRIVE_QUERY_ERROR');
 
     const json = await res.json() as { files?: GoogleDriveFileRaw[] };
-    const files = json.files ?? [];
-    return files.length > 0 ? toFileEntry(files[0], (n) => this.fileNameToKey(n)) : null;
+    const files = (json.files ?? []).map(f => toFileEntry(f, (n) => this.fileNameToKey(n)));
+    return this.findExactFileNameMatch(files, name);
   }
 
   private async createFile(name: string, body: string): Promise<FileEntry> {

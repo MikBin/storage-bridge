@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { GoogleDriveProvider } from '../google-drive-provider.js';
 import { createDriveApiMock } from './google-drive-api-mock.js';
 import type { OAuthClient, OAuthTokens } from '@storage-bridge/auth-web';
-import { ConflictError, AuthRequiredError } from '@storage-bridge/core';
+import { ConflictError, AuthRequiredError, SettingsStoreError } from '@storage-bridge/core';
 
 function createFakeOAuthClient(): OAuthClient {
   const tokens: OAuthTokens = {
@@ -194,6 +194,134 @@ describe('GoogleDriveProvider', () => {
       const { provider } = createProvider();
       const result = await provider.readFile('nonexistent.json');
       expect(result).toBeNull();
+    });
+  });
+
+  describe('query safety and error honesty (02-01)', () => {
+    // bypass: fast-check not installed; deterministic case matrix (explicit key corpus).
+    // Universe per test: the remote store (fileCount, filesByName: name -> contents)
+    // plus the document returned through the putDocument/getDocument driving port.
+    // Slots not asserted are pinned with before/after snapshot equality (unchanged()).
+    const KEY_MATRIX = [
+      { label: 'an apostrophe', key: "settings-user's-doc" },
+      { label: 'a space', key: 'settings doc with spaces' },
+      { label: 'a slash', key: 'settings/deep/nested' },
+      { label: 'a colon', key: 'settings:section:key' },
+      { label: 'unicode characters', key: 'réglages-中文-настройки' },
+      { label: 'an emoji', key: 'settings-🚀-doc' },
+    ] as const;
+
+    interface StoreSnapshot {
+      fileCount: number;
+      filesByName: Map<string, string[]>;
+    }
+
+    function snapshotStore(api: ReturnType<typeof createDriveApiMock>): StoreSnapshot {
+      const filesByName = new Map<string, string[]>();
+      for (const file of api.files.values()) {
+        filesByName.set(file.name, [...(filesByName.get(file.name) ?? []), file.content]);
+      }
+      return { fileCount: api.files.size, filesByName };
+    }
+
+    for (const { label, key } of KEY_MATRIX) {
+      it(`round-trips a key containing ${label} with identical data and no duplicate remote files`, async () => {
+        const { provider, api } = createProvider();
+        const data = { marker: label };
+        const before = snapshotStore(api);
+
+        await provider.putDocument({ key, schemaVersion: 1, updatedAt: '', data });
+        await provider.putDocument({ key, schemaVersion: 1, updatedAt: '', data });
+        await provider.putDocument({ key, schemaVersion: 1, updatedAt: '', data });
+
+        const after = snapshotStore(api);
+        expect(after.fileCount).toBe(before.fileCount + 1);
+        expect(after.filesByName.size).toBe(1);
+        const contents = [...after.filesByName.values()][0];
+        expect(contents).toHaveLength(1);
+        const storedDocument = JSON.parse(contents![0]) as { data: { marker: string } };
+        expect(storedDocument.data).toEqual(data);
+
+        const retrieved = await provider.getDocument<{ marker: string }>(key);
+        expect(retrieved).not.toBeNull();
+        expect(retrieved!.key).toBe(key);
+        expect(retrieved!.data).toEqual(data);
+      });
+    }
+
+    it('resolves reads to the exact name match when same-name remote files already exist', async () => {
+      const { provider, api } = createProvider();
+      const key = "settings-user's-doc";
+      const fileName = `${encodeURIComponent(key)}.json`;
+      const envelopeFor = (v: number): string =>
+        JSON.stringify({ key, schemaVersion: 1, updatedAt: '2026-01-01T00:00:00Z', data: { v } });
+      api.files.set('seed-1', {
+        id: 'seed-1',
+        name: fileName,
+        content: envelopeFor(1),
+        mimeType: 'application/json',
+        modifiedTime: new Date().toISOString(),
+        version: 1,
+        trashed: false,
+      });
+      api.files.set('seed-2', {
+        id: 'seed-2',
+        name: fileName,
+        content: envelopeFor(2),
+        mimeType: 'application/json',
+        modifiedTime: new Date().toISOString(),
+        version: 2,
+        trashed: false,
+      });
+      const before = snapshotStore(api);
+
+      const retrieved = await provider.getDocument<{ v: number }>(key);
+
+      const after = snapshotStore(api);
+      expect(after).toEqual(before);
+      expect(retrieved).not.toBeNull();
+      expect([1, 2]).toContain(retrieved!.data.v);
+    });
+
+    it('rejects getDocument with a coded SettingsStoreError when the query fails — never silent null', async () => {
+      const { provider, api } = createProvider();
+      await provider.putDocument({ key: 'taxonomy', schemaVersion: 1, updatedAt: '', data: { v: 1 } });
+      const before = snapshotStore(api);
+
+      api.setQueryFailure(500);
+
+      await expect(provider.getDocument('taxonomy')).rejects.toThrow(SettingsStoreError);
+      await expect(provider.getDocument('taxonomy')).rejects.toMatchObject({ code: 'DRIVE_QUERY_ERROR' });
+      expect(snapshotStore(api)).toEqual(before);
+    });
+
+    it('rejects putDocument when the query fails instead of silently creating a duplicate', async () => {
+      const { provider, api } = createProvider();
+      await provider.putDocument({ key: 'safe-write', schemaVersion: 1, updatedAt: '', data: { v: 1 } });
+      const before = snapshotStore(api);
+
+      api.setQueryFailure(500);
+
+      await expect(
+        provider.putDocument({ key: 'safe-write', schemaVersion: 1, updatedAt: '', data: { v: 2 } }),
+      ).rejects.toMatchObject({ code: 'DRIVE_QUERY_ERROR' });
+      expect(snapshotStore(api)).toEqual(before);
+    });
+
+    it('preserves AuthRequiredError when the query fails with 401', async () => {
+      const api = createDriveApiMock();
+      const loggedOutAuth: OAuthClient = {
+        login: async () => {},
+        logout: async () => {},
+        getAccessToken: async () => {
+          throw new Error('Not authenticated');
+        },
+        getTokens: async () => null,
+        getAuthHeaders: async () => ({}),
+      };
+      const provider = new GoogleDriveProvider({ auth: loggedOutAuth, fetchFn: api.mockFetch as typeof fetch });
+
+      await expect(provider.getDocument('any-key')).rejects.toThrow(AuthRequiredError);
     });
   });
 });

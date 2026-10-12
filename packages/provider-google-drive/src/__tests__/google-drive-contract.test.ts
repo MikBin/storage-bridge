@@ -14,20 +14,17 @@ import type { OAuthClient, OAuthTokens } from '@storage-bridge/auth-web';
  */
 const PENDING_FAMILIES: readonly ContractFamily[] = [
   'disconnected-operations', // 02-04: reads before connect() resolve to null instead of rejecting
-  'error-taxonomy',          // 02-06: findFileByName() swallows HTTP errors and returns null silently
   'conflict-payload',        // 02-05: ConflictError carries the encoded filename, no logical-key payload
 ];
 
 /**
  * Scenario-level scaffolds: the provider satisfies the rest of the family.
- * The apostrophe key is silently lost today — encodeURIComponent leaves the
- * apostrophe raw, so findFileByName()'s name='…' query never matches the stored
- * file and getDocument() resolves null (review evidence:
- * google-drive-provider.ts findFileByName). Owned by 02-01.
+ * 'special-char-keys:apostrophe' (Drive query literal escaping) and the Drive
+ * 'error-taxonomy' activation (findFileByName() silent null on HTTP error)
+ * were activated by 02-01; the remaining families are owned by the steps
+ * annotated above.
  */
-const PENDING_SCENARIOS: readonly string[] = [
-  'special-char-keys:apostrophe',
-];
+const PENDING_SCENARIOS: readonly string[] = [];
 
 function createContractProvider(): GoogleDriveProvider {
   const api = createDriveApiMock();

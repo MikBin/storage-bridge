@@ -37,6 +37,16 @@ export abstract class FileBackedDocumentProvider implements DocumentStoreProvide
     return decodeURIComponent(fileName.replace(/\.json$/, ''));
   }
 
+  /**
+   * Exact-name disambiguation for storage backends that return candidate
+   * files for a name lookup: only a file whose remote name equals the
+   * requested fileName satisfies the lookup, so prefix or fuzzy matches
+   * from the backend listing never resolve.
+   */
+  protected findExactFileNameMatch(files: FileEntry[], fileName: string): FileEntry | null {
+    return files.find(file => file.name === fileName) ?? null;
+  }
+
   async getDocument<T>(key: string): Promise<SettingsEnvelope<T> | null> {
     const file = await this.readFile(this.keyToFileName(key));
     if (!file) return null;
