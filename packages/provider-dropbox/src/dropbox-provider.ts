@@ -22,6 +22,12 @@ export class DropboxProvider extends FileBackedDocumentProvider {
 
   private readonly auth: OAuthClient;
   private readonly fetchFn: typeof fetch;
+  /**
+   * Minimal connection flag (02-06 uniform pre-connect policy): data ops
+   * before connect() reject NotConnectedError instead of leaking a raw 401.
+   * Lifecycle truth (token-derived state) is step 02-08's concern.
+   */
+  private connected = false;
 
   constructor(options: DropboxProviderOptions) {
     super();
@@ -31,14 +37,16 @@ export class DropboxProvider extends FileBackedDocumentProvider {
 
   async connect(): Promise<void> {
     await this.auth.login();
+    this.connected = true;
   }
 
   async disconnect(): Promise<void> {
     await this.auth.logout();
+    this.connected = false;
   }
 
   async isConnected(): Promise<boolean> {
-    return !!(await this.auth.getTokens());
+    return this.connected;
   }
 
   async getProfile() {
@@ -61,7 +69,25 @@ export class DropboxProvider extends FileBackedDocumentProvider {
     if (!res.ok) throw new SettingsStoreError(`Dropbox read failed: ${res.status}`, 'DROPBOX_READ_ERROR');
 
     const metaHeader = res.headers.get('Dropbox-API-Result') ?? '{}';
-    const raw = JSON.parse(metaHeader) as DropboxFileRaw;
+
+    // Remote metadata headers are untrusted input: a non-JSON or wrong-shape
+    // header rejects with a coded SettingsStoreError chaining the underlying
+    // failure — a raw SyntaxError never escapes the provider boundary (02-06).
+    let raw: DropboxFileRaw;
+    try {
+      const parsed: unknown = JSON.parse(metaHeader);
+      if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+        throw new Error(`Parsed metadata is ${parsed === null ? 'null' : Array.isArray(parsed) ? 'array' : typeof parsed} instead of an object`);
+      }
+      raw = parsed as DropboxFileRaw;
+    } catch (error) {
+      throw new SettingsStoreError(
+        'Dropbox read returned a corrupt metadata header',
+        'DROPBOX_META_CORRUPT',
+        error instanceof Error ? error : new Error(String(error)),
+      );
+    }
+
     return { text: await res.text(), meta: toFileEntry(raw, (n) => this.fileNameToKey(n)) };
   }
 

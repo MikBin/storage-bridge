@@ -11,9 +11,14 @@ import type { OAuthClient, OAuthTokens } from '@storage-bridge/auth-web';
  * declare the post-remediation behavior the provider does not satisfy yet;
  * activating a family is the acceptance gate of the step that owns it.
  */
-const PENDING_FAMILIES: readonly ContractFamily[] = [
-  'disconnected-operations', // 02-04: provider performs requests without a connection guard
-];
+/**
+ * Family participation: all families the harness can exercise run ACTIVE.
+ * 'disconnected-operations' was activated by 02-06 (minimal connected flag +
+ * uniform pre-connect NotConnectedError guard). Pending families declare the
+ * post-remediation behavior the provider does not satisfy yet; activating a
+ * family is the acceptance gate of the step that owns it.
+ */
+const PENDING_FAMILIES: readonly ContractFamily[] = [];
 
 const api = createOneDriveApiMock();
 

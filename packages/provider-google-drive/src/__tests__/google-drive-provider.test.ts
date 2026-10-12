@@ -56,20 +56,12 @@ describe('GoogleDriveProvider', () => {
       expect(logoutCalled).toBe(true);
     });
 
-    it('isConnected returns true when tokens exist', async () => {
+    it('isConnected reflects the connect/disconnect flag (02-06 uniform pre-connect policy)', async () => {
       const { provider } = createProvider();
+      expect(await provider.isConnected()).toBe(false);
+      await provider.connect();
       expect(await provider.isConnected()).toBe(true);
-    });
-
-    it('isConnected returns false when tokens are null', async () => {
-      const auth: OAuthClient = {
-        login: async () => {},
-        logout: async () => {},
-        getAccessToken: async () => { throw new Error('no tokens'); },
-        getTokens: async () => null,
-        getAuthHeaders: async () => ({ Authorization: 'Bearer token' }),
-      };
-      const provider = new GoogleDriveProvider({ auth, fetchFn: (() => Promise.resolve(new Response())) as unknown as typeof fetch });
+      await provider.disconnect();
       expect(await provider.isConnected()).toBe(false);
     });
 
@@ -227,6 +219,7 @@ describe('GoogleDriveProvider', () => {
     for (const { label, key } of KEY_MATRIX) {
       it(`round-trips a key containing ${label} with identical data and no duplicate remote files`, async () => {
         const { provider, api } = createProvider();
+        await provider.connect();
         const data = { marker: label };
         const before = snapshotStore(api);
 
@@ -251,6 +244,7 @@ describe('GoogleDriveProvider', () => {
 
     it('resolves reads to the exact name match when same-name remote files already exist', async () => {
       const { provider, api } = createProvider();
+      await provider.connect();
       const key = "settings-user's-doc";
       const fileName = `${encodeURIComponent(key)}.json`;
       const envelopeFor = (v: number): string =>
@@ -285,6 +279,7 @@ describe('GoogleDriveProvider', () => {
 
     it('rejects getDocument with a coded SettingsStoreError when the query fails — never silent null', async () => {
       const { provider, api } = createProvider();
+      await provider.connect();
       await provider.putDocument({ key: 'taxonomy', schemaVersion: 1, updatedAt: '', data: { v: 1 } });
       const before = snapshotStore(api);
 
@@ -297,6 +292,7 @@ describe('GoogleDriveProvider', () => {
 
     it('rejects putDocument when the query fails instead of silently creating a duplicate', async () => {
       const { provider, api } = createProvider();
+      await provider.connect();
       await provider.putDocument({ key: 'safe-write', schemaVersion: 1, updatedAt: '', data: { v: 1 } });
       const before = snapshotStore(api);
 
@@ -308,18 +304,11 @@ describe('GoogleDriveProvider', () => {
       expect(snapshotStore(api)).toEqual(before);
     });
 
-    it('preserves AuthRequiredError when the query fails with 401', async () => {
-      const api = createDriveApiMock();
-      const loggedOutAuth: OAuthClient = {
-        login: async () => {},
-        logout: async () => {},
-        getAccessToken: async () => {
-          throw new Error('Not authenticated');
-        },
-        getTokens: async () => null,
-        getAuthHeaders: async () => ({}),
-      };
-      const provider = new GoogleDriveProvider({ auth: loggedOutAuth, fetchFn: api.mockFetch as typeof fetch });
+    it('preserves AuthRequiredError when the query fails with 401 on a connected provider', async () => {
+      const { provider, api } = createProvider();
+      await provider.connect();
+
+      api.setQueryFailure(401);
 
       await expect(provider.getDocument('any-key')).rejects.toThrow(AuthRequiredError);
     });

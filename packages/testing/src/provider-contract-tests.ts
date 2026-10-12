@@ -42,13 +42,14 @@ export const FAMILY_OWNERS: Readonly<Record<ContractFamily, string>> = {
  * owning remediation step lands. Used when a caller provides no explicit
  * `pendingFamilies`. Replaced (not merged) by an explicit list.
  *
- * 'conflict-payload' left this default when its owning step (02-05) landed:
- * ConflictError now carries the logical key, and every provider built on the
- * shared file/record-backed bases satisfies the family by construction.
+ * 'disconnected-operations' (02-04) and 'error-taxonomy' (02-06) left this
+ * default when their owning steps landed: the uniform pre-connect
+ * NotConnectedError policy and the coded+cause error taxonomy are landed
+ * contract now, and the shared fake models both. The remaining defaults are
+ * hook-gated (an in-memory store cannot emulate pagination or 5xx faults),
+ * so they register as `it.todo` scaffolds, not `it.fails`.
  */
 export const DEFAULT_PENDING_FAMILIES: readonly ContractFamily[] = [
-  'disconnected-operations',
-  'error-taxonomy',
   'pagination',
   'server-errors',
 ];
@@ -180,6 +181,7 @@ export function describeProviderContract(
     describe('Connect/Disconnect Lifecycle', () => {
       declareScenario(pending, pendingScenarios, hooks, {
         family: 'honest-lifecycle',
+        scenarioId: 'honest-lifecycle:starts-disconnected',
         name: 'starts disconnected',
         body: async () => {
           const provider = factory();
@@ -195,6 +197,7 @@ export function describeProviderContract(
 
       declareScenario(pending, pendingScenarios, hooks, {
         family: 'honest-lifecycle',
+        scenarioId: 'honest-lifecycle:disconnect-transitions',
         name: 'disconnect() transitions back to disconnected',
         body: async () => {
           const provider = factory();
@@ -211,6 +214,7 @@ export function describeProviderContract(
 
       declareScenario(pending, pendingScenarios, hooks, {
         family: 'honest-lifecycle',
+        scenarioId: 'honest-lifecycle:profile-null-when-disconnected',
         name: 'getProfile() returns null when disconnected',
         body: async () => {
           const provider = factory();

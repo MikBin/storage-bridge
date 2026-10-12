@@ -3,13 +3,37 @@ import {
   SettingsStoreError,
   NotConnectedError,
   UnsupportedProviderError,
-  DocumentNotFoundError,
   ConflictError,
   AuthRequiredError,
   ProviderUnavailableError,
 } from '../errors.js';
+import * as errorModule from '../errors.js';
 
 describe('Errors', () => {
+  describe('taxonomy hygiene (02-06)', () => {
+    it('no longer exports DocumentNotFoundError — it was dead taxonomy', () => {
+      expect((errorModule as { DocumentNotFoundError?: unknown }).DocumentNotFoundError).toBeUndefined();
+    });
+  });
+
+  describe('AuthExchangeError (02-06)', () => {
+    it('constructs with provider and cause, coded AUTH_EXCHANGE', async () => {
+      // Dynamic import so a missing export fails this assertion (semantic RED),
+      // not the module graph (collection error).
+      const { AuthExchangeError } = (await import('../errors.js')) as typeof errorModule;
+      expect(AuthExchangeError).toBeTypeOf('function');
+
+      const cause = new Error('HTTP 503: upstream unavailable');
+      const err = new AuthExchangeError('google-drive', cause);
+      expect(err).toBeInstanceOf(SettingsStoreError);
+      expect(err).toBeInstanceOf(AuthExchangeError);
+      expect(err.message).toBe('Token exchange failed for google-drive');
+      expect(err.code).toBe('AUTH_EXCHANGE');
+      expect(err.name).toBe('AuthExchangeError');
+      expect(err.cause).toBe(cause);
+    });
+  });
+
   describe('SettingsStoreError', () => {
     it('constructs properly', () => {
       const err = new SettingsStoreError('test message', 'TEST_CODE');
@@ -47,17 +71,6 @@ describe('Errors', () => {
       expect(err.message).toBe('Unsupported provider: xyz');
       expect(err.code).toBe('UNSUPPORTED_PROVIDER');
       expect(err.name).toBe('UnsupportedProviderError');
-    });
-  });
-
-  describe('DocumentNotFoundError', () => {
-    it('constructs properly', () => {
-      const err = new DocumentNotFoundError('doc1');
-      expect(err).toBeInstanceOf(SettingsStoreError);
-      expect(err).toBeInstanceOf(DocumentNotFoundError);
-      expect(err.message).toBe('Document not found: doc1');
-      expect(err.code).toBe('DOCUMENT_NOT_FOUND');
-      expect(err.name).toBe('DocumentNotFoundError');
     });
   });
 

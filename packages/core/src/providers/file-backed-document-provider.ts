@@ -1,3 +1,4 @@
+import { NotConnectedError, SettingsStoreError } from '../errors.js';
 import type {
   DocumentStoreProvider,
   ProviderId,
@@ -54,14 +55,63 @@ export abstract class FileBackedDocumentProvider implements DocumentStoreProvide
     return files.find(file => file.name === fileName) ?? null;
   }
 
+  /**
+   * Uniform pre-connect policy (02-06): every data operation rejects with
+   * NotConnectedError before connect(), based on the provider's honest
+   * isConnected() answer — never with a raw transport 401 masquerading as an
+   * auth failure.
+   */
+  private async ensureConnected(): Promise<void> {
+    if (!(await this.isConnected())) {
+      throw new NotConnectedError();
+    }
+  }
+
+  /**
+   * Remote payloads are untrusted input: anything that does not parse to a
+   * settings-envelope object rejects with a coded DOCUMENT_CORRUPT
+   * SettingsStoreError whose cause chains the underlying parse failure — a
+   * raw SyntaxError never escapes the provider boundary (02-06).
+   */
+  private parseEnvelope<T>(text: string): SettingsEnvelope<T> {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(text);
+    } catch (error) {
+      throw new SettingsStoreError(
+        'Remote document is not valid JSON',
+        'DOCUMENT_CORRUPT',
+        error instanceof Error ? error : new Error(String(error)),
+      );
+    }
+
+    if (
+      typeof parsed !== 'object' ||
+      parsed === null ||
+      Array.isArray(parsed) ||
+      !('data' in parsed)
+    ) {
+      const observed = parsed === null ? 'null' : Array.isArray(parsed) ? 'array' : typeof parsed;
+      throw new SettingsStoreError(
+        'Remote document payload is not a settings envelope',
+        'DOCUMENT_CORRUPT',
+        new Error(`Parsed payload is ${observed} instead of a settings-envelope object`),
+      );
+    }
+
+    return parsed as SettingsEnvelope<T>;
+  }
+
   async getDocument<T>(key: string): Promise<SettingsEnvelope<T> | null> {
+    await this.ensureConnected();
     const file = await this.readFile(this.keyToFileName(key));
     if (!file) return null;
-    const parsed = JSON.parse(file.text) as SettingsEnvelope<T>;
+    const parsed = this.parseEnvelope<T>(file.text);
     return { ...parsed, key, revision: file.meta.revision ?? parsed.revision };
   }
 
   async putDocument<T>(doc: SettingsEnvelope<T>, options?: PutOptions): Promise<SettingsEnvelope<T>> {
+    await this.ensureConnected();
     const now = new Date().toISOString();
     const payload = JSON.stringify({ ...doc, updatedAt: now });
     const meta = await this.writeFile(this.keyToFileName(doc.key), payload, options);
@@ -69,10 +119,12 @@ export abstract class FileBackedDocumentProvider implements DocumentStoreProvide
   }
 
   async deleteDocument(key: string): Promise<void> {
+    await this.ensureConnected();
     await this.removeFile(this.keyToFileName(key));
   }
 
   async listDocuments(): Promise<SettingsSummary[]> {
+    await this.ensureConnected();
     const files = await this.listFiles();
     return files.map(f => ({
       key: f.logicalKey,

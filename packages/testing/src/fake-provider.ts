@@ -6,7 +6,7 @@ import type {
   ConnectedProfile,
   PutOptions,
 } from '@storage-bridge/core';
-import { ConflictError } from '@storage-bridge/core';
+import { ConflictError, NotConnectedError } from '@storage-bridge/core';
 
 /**
  * In-memory DocumentStoreProvider for testing.
@@ -37,13 +37,22 @@ export class FakeDocumentStoreProvider implements DocumentStoreProvider {
     return this.profile;
   }
 
+  /** Uniform pre-connect policy (02-06), mirroring the real providers. */
+  private ensureConnected(): void {
+    if (!this.connected) {
+      throw new NotConnectedError();
+    }
+  }
+
   async getDocument<T>(key: string): Promise<SettingsEnvelope<T> | null> {
+    this.ensureConnected();
     const entry = this.store.get(key);
     if (!entry) return null;
     return entry as SettingsEnvelope<T>;
   }
 
   async putDocument<T>(doc: SettingsEnvelope<T>, options?: PutOptions): Promise<SettingsEnvelope<T>> {
+    this.ensureConnected();
     const existing = this.store.get(doc.key);
 
     // D2 semantics mirrored from the real providers: an expectation rejects
@@ -69,10 +78,12 @@ export class FakeDocumentStoreProvider implements DocumentStoreProvider {
   }
 
   async deleteDocument(key: string): Promise<void> {
+    this.ensureConnected();
     this.store.delete(key);
   }
 
   async listDocuments(): Promise<SettingsSummary[]> {
+    this.ensureConnected();
     return Array.from(this.store.values()).map(entry => ({
       key: entry.key,
       updatedAt: entry.updatedAt,

@@ -1,7 +1,8 @@
 import type { OAuthClient, OAuthTokens } from '@storage-bridge/auth-web';
+import { requireTokenEndpointSuccess } from '@storage-bridge/auth-web';
 import type { ReactNativeOAuthConfig } from './types.js';
 import { AuthRequest } from 'expo-auth-session';
-import { AuthRequiredError } from '@storage-bridge/core';
+import { AuthExchangeError, AuthRequiredError } from '@storage-bridge/core';
 
 const REFRESH_BUFFER_MS = 60_000;
 
@@ -26,6 +27,24 @@ export class ReactNativeOAuthClient implements OAuthClient {
     this.config = options.config;
     this.tokenStore = options.tokenStore ?? this.createDefaultTokenStore();
     this.fetchFn = options.fetchFn ?? fetch;
+  }
+
+  /**
+   * Posts the token-endpoint form body, wrapping fetch transport failures
+   * (network errors) as AuthExchangeError with the original error as cause —
+   * a network failure is never an auth rejection (02-06). Shares the pure
+   * response classifier with the web client for the 03-03 TokenManager split.
+   */
+  private async postTokenForm(params: URLSearchParams): Promise<Response> {
+    try {
+      return await this.fetchFn(this.config.tokenEndpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: params.toString(),
+      });
+    } catch (error) {
+      throw new AuthExchangeError(this.config.providerId, error instanceof Error ? error : new Error(String(error)));
+    }
   }
 
   async login(): Promise<void> {
@@ -61,15 +80,8 @@ export class ReactNativeOAuthClient implements OAuthClient {
       tokenParams.append('code_verifier', request.codeVerifier);
     }
 
-    const response = await this.fetchFn(this.config.tokenEndpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: tokenParams.toString(),
-    });
-
-    if (!response.ok) {
-      throw new AuthRequiredError(this.config.providerId);
-    }
+    const response = await this.postTokenForm(tokenParams);
+    await requireTokenEndpointSuccess(response, this.config.providerId);
 
     const json = await response.json() as {
       access_token: string;
@@ -126,15 +138,18 @@ export class ReactNativeOAuthClient implements OAuthClient {
       client_id: this.config.clientId,
     });
 
-    const response = await this.fetchFn(this.config.tokenEndpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: params.toString(),
-    });
+    const response = await this.postTokenForm(params);
 
-    if (!response.ok) {
-      await this.tokenStore.remove(this.config.providerId);
-      throw new AuthRequiredError(this.config.providerId);
+    // Only a genuine auth rejection (400 invalid_grant / 401 / 403) kills the
+    // stored grant; transport and 5xx failures (AuthExchangeError) preserve it
+    // so the refresh can be retried (02-06).
+    try {
+      await requireTokenEndpointSuccess(response, this.config.providerId);
+    } catch (error) {
+      if (error instanceof AuthRequiredError) {
+        await this.tokenStore.remove(this.config.providerId);
+      }
+      throw error;
     }
 
     const json = await response.json() as {

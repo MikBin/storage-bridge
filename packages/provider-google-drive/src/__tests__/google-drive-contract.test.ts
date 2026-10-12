@@ -12,9 +12,15 @@ import type { OAuthClient, OAuthTokens } from '@storage-bridge/auth-web';
  * behavior the provider does not satisfy yet; activating a family is the
  * acceptance gate of the step that owns it.
  */
-const PENDING_FAMILIES: readonly ContractFamily[] = [
-  'disconnected-operations', // 02-04: reads before connect() resolve to null instead of rejecting
-];
+/**
+ * Family participation: all families the harness can exercise run ACTIVE.
+ * 'disconnected-operations' was activated by 02-06 (minimal connected flag +
+ * uniform pre-connect NotConnectedError guard); 'error-taxonomy' by 02-01.
+ * Remaining pending families declare the post-remediation behavior the
+ * provider does not satisfy yet; activating a family is the acceptance gate
+ * of the step that owns it.
+ */
+const PENDING_FAMILIES: readonly ContractFamily[] = [];
 
 /**
  * Scenario-level scaffolds: the provider satisfies the rest of the family.

@@ -38,9 +38,12 @@ export class CloudKitClient {
     if (!response.ok) {
       // 5xx and other transport failures surface as a coded SettingsStoreError
       // so callers can distinguish a server outage from a silent empty result.
+      // The response detail (status + body excerpt) is chained as cause (02-06).
+      const excerpt = (await response.text().catch(() => '')).slice(0, 200);
       throw new SettingsStoreError(
         `CloudKit API error: ${response.status} ${response.statusText}`,
         'ICLOUD_REQUEST_ERROR',
+        new Error(`HTTP ${response.status}: ${excerpt || '<no body>'}`),
       );
     }
 
@@ -58,7 +61,13 @@ export class CloudKitClient {
     }
 
     if (record.serverErrorCode) {
-      throw new Error(`CloudKit error: ${record.serverErrorCode} - ${record.reason}`);
+      // In-band CloudKit application errors are coded store failures too —
+      // a raw Error must never escape the client boundary (02-06).
+      throw new SettingsStoreError(
+        `CloudKit record lookup failed: ${recordName}`,
+        'ICLOUD_RECORD_ERROR',
+        new Error(`${record.serverErrorCode} - ${record.reason}`),
+      );
     }
 
     return record;
@@ -77,11 +86,17 @@ export class CloudKitClient {
     const result = data.records?.[0];
 
     if (result?.serverErrorCode === 'CONFLICT') {
-      throw new ConflictError(`Conflict when saving record ${record.recordName}`);
+      // Payload is the logical record name — never a message sentence (02-06,
+      // conflict-payload contract).
+      throw new ConflictError(record.recordName);
     }
 
     if (!result || result.serverErrorCode) {
-      throw new Error(`CloudKit save error: ${result?.serverErrorCode} - ${result?.reason}`);
+      throw new SettingsStoreError(
+        `CloudKit record save failed: ${record.recordName}`,
+        'ICLOUD_SAVE_ERROR',
+        new Error(`${result?.serverErrorCode ?? 'NO_RESULT'} - ${result?.reason ?? 'no result returned'}`),
+      );
     }
 
     return result;
@@ -103,7 +118,11 @@ export class CloudKitClient {
     }
 
     if (!result || (result.serverErrorCode && result.serverErrorCode !== 'NOT_FOUND')) {
-      throw new Error(`CloudKit delete error: ${result?.serverErrorCode} - ${result?.reason}`);
+      throw new SettingsStoreError(
+        `CloudKit record delete failed: ${recordName}`,
+        'ICLOUD_DELETE_ERROR',
+        new Error(`${result?.serverErrorCode ?? 'NO_RESULT'} - ${result?.reason ?? 'no result returned'}`),
+      );
     }
   }
 

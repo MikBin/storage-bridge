@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { CloudKitClient } from '../cloudkit-client.js';
 import { createCloudKitApiMock } from './icloud-api-mock.js';
+import { ConflictError, SettingsStoreError } from '@storage-bridge/core';
 
 describe('CloudKitClient', () => {
   let apiMock: ReturnType<typeof createCloudKitApiMock>;
@@ -45,6 +46,85 @@ describe('CloudKitClient', () => {
     });
   });
 
+  describe('coded error taxonomy (02-06)', () => {
+    // bypass: fast-check not installed; deterministic per-operation cases.
+    // Every CloudKit failure must surface as a coded SettingsStoreError with a
+    // populated cause — no raw Error escapes the client boundary.
+    async function captureRejection(operation: Promise<unknown>): Promise<unknown> {
+      try {
+        await operation;
+      } catch (error) {
+        return error;
+      }
+      throw new Error('Expected the operation to reject, but it resolved');
+    }
+
+    it('getRecord() on a 5xx response rejects with coded ICLOUD_REQUEST_ERROR and a populated cause', async () => {
+      apiMock.setGlobalFailure(500);
+
+      const error = await captureRejection(client.getRecord('doc1'));
+      expect(error).toBeInstanceOf(SettingsStoreError);
+      expect((error as SettingsStoreError).code).toBe('ICLOUD_REQUEST_ERROR');
+      expect((error as SettingsStoreError).cause).toBeInstanceOf(Error);
+    });
+
+    it('getRecord() with an in-band server error rejects with coded ICLOUD_RECORD_ERROR', async () => {
+      apiMock.setOperationFailure('lookup', 'UNKNOWN_ERROR', 'quota exceeded');
+
+      const error = await captureRejection(client.getRecord('doc1'));
+      expect(error).toBeInstanceOf(SettingsStoreError);
+      expect((error as SettingsStoreError).code).toBe('ICLOUD_RECORD_ERROR');
+      expect((error as SettingsStoreError).message).toContain('doc1');
+      expect((error as SettingsStoreError).cause).toBeInstanceOf(Error);
+    });
+
+    it('saveRecord() on a real server conflict throws ConflictError carrying the record name as key', async () => {
+      apiMock.reset({
+        counter: 0, records: {
+          'doc1': {
+            recordName: 'doc1',
+            recordChangeTag: 'current-tag',
+            fields: { key: { value: 'doc1' } }
+          }
+        }
+      });
+
+      const error = await captureRejection(client.saveRecord({
+        recordName: 'doc1',
+        recordType: 'SettingsDocument',
+        recordChangeTag: 'old-tag',
+        fields: { key: { value: 'doc1' } }
+      }));
+
+      expect(error).toBeInstanceOf(ConflictError);
+      expect((error as ConflictError).key).toBe('doc1');
+    });
+
+    it('saveRecord() with an in-band server error rejects with coded ICLOUD_SAVE_ERROR', async () => {
+      apiMock.setOperationFailure('modify', 'UNKNOWN_ERROR', 'validation failed');
+
+      const error = await captureRejection(client.saveRecord({
+        recordName: 'doc1',
+        recordType: 'SettingsDocument',
+        fields: { key: { value: 'doc1' } }
+      }));
+
+      expect(error).toBeInstanceOf(SettingsStoreError);
+      expect((error as SettingsStoreError).code).toBe('ICLOUD_SAVE_ERROR');
+      expect((error as SettingsStoreError).cause).toBeInstanceOf(Error);
+    });
+
+    it('removeRecord() with an in-band server error rejects with coded ICLOUD_DELETE_ERROR', async () => {
+      apiMock.setOperationFailure('modify', 'UNKNOWN_ERROR', 'delete rejected');
+
+      const error = await captureRejection(client.removeRecord('doc1'));
+
+      expect(error).toBeInstanceOf(SettingsStoreError);
+      expect((error as SettingsStoreError).code).toBe('ICLOUD_DELETE_ERROR');
+      expect((error as SettingsStoreError).cause).toBeInstanceOf(Error);
+    });
+  });
+
   describe('saveRecord', () => {
     it('creates a new record', async () => {
       const result = await client.saveRecord({
@@ -83,7 +163,7 @@ describe('CloudKitClient', () => {
       expect(state.records['doc1'].fields.updated.value).toBe(true);
     });
 
-    it('throws error on conflict', async () => {
+    it('throws ConflictError on conflict with the record name as payload key', async () => {
       apiMock.reset({
         counter: 0, records: {
           'doc1': {
@@ -94,12 +174,18 @@ describe('CloudKitClient', () => {
         }
       });
 
-      await expect(client.saveRecord({
-        recordName: 'doc1',
-        recordType: 'SettingsDocument',
-        recordChangeTag: 'old-tag',
-        fields: { key: { value: 'doc1' } }
-      })).rejects.toThrow('Conflict');
+      try {
+        await client.saveRecord({
+          recordName: 'doc1',
+          recordType: 'SettingsDocument',
+          recordChangeTag: 'old-tag',
+          fields: { key: { value: 'doc1' } }
+        });
+        throw new Error('Expected saveRecord to reject with ConflictError');
+      } catch (error) {
+        expect(error).toBeInstanceOf(ConflictError);
+        expect((error as ConflictError).key).toBe('doc1');
+      }
     });
   });
 

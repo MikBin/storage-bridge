@@ -23,14 +23,27 @@ function createHarness(listPageSize?: number): ICloudProvider {
  * families instead. Activating a family (removing it from this list) is the
  * acceptance gate of the remediation step that owns it.
  */
-const PENDING_FAMILIES: readonly ContractFamily[] = [
-  'honest-lifecycle',        // 02-08: provider fabricates connect/isConnected/getProfile state
-  'error-taxonomy',          // 02-06: disconnected reads resolve instead of rejecting
-  'disconnected-operations', // 02-04: operations succeed before connect()
+/**
+ * Family participation: 'error-taxonomy' and 'disconnected-operations' were
+ * activated by 02-06 (minimal connected flag, uniform pre-connect
+ * NotConnectedError guard via the RecordBacked base, coded CloudKit errors).
+ *
+ * The 02-06 flag also satisfies the isConnected clauses of 'honest-lifecycle'
+ * ('starts disconnected', 'disconnect() transitions back') as a side effect —
+ * a passing it.fails scaffold fails the suite, so those two run active at
+ * scenario granularity. The remaining honest-lifecycle lie (getProfile()
+ * fabricating a profile while disconnected) stays pending for 02-08.
+ * Activating it is 02-08's acceptance gate.
+ */
+const PENDING_FAMILIES: readonly ContractFamily[] = [];
+
+const PENDING_SCENARIOS: readonly string[] = [
+  'honest-lifecycle:profile-null-when-disconnected', // 02-08
 ];
 
 describeProviderContract('ICloudProvider', () => createHarness(), {
   pendingFamilies: PENDING_FAMILIES,
+  pendingScenarios: PENDING_SCENARIOS,
   withListPageSize: pageSize => () => createHarness(pageSize),
   runWithServerError: async operation => {
     apiMock.setGlobalFailure(500);

@@ -5,6 +5,12 @@ import { mapFromCloudRecord, mapToCloudRecord } from './record-mapper.js';
 export class ICloudProvider extends RecordBackedDocumentProvider {
   readonly id: ProviderId = 'icloud';
   private readonly client: CloudKitClient;
+  /**
+   * Minimal connection flag (02-06 uniform pre-connect policy): data ops
+   * before connect() reject NotConnectedError. The full honest lifecycle
+   * (getProfile truth, fabricated state removal) stays with step 02-08.
+   */
+  private connected = false;
 
   constructor(config: CloudKitConfig) {
     super();
@@ -27,16 +33,16 @@ export class ICloudProvider extends RecordBackedDocumentProvider {
   }
 
   async connect(): Promise<void> {
-    // CloudKit uses container authentication, nothing to do here
+    // CloudKit uses container authentication — only the local flag flips.
+    this.connected = true;
   }
 
   async disconnect(): Promise<void> {
-    // CloudKit uses container authentication, nothing to do here
+    this.connected = false;
   }
 
   async isConnected(): Promise<boolean> {
-    // CloudKit REST APIs are stateless, so we're always "connected" if we have config
-    return true;
+    return this.connected;
   }
 
   async getProfile(): Promise<ConnectedProfile | null> {

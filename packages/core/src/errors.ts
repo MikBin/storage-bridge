@@ -19,10 +19,24 @@ export class UnsupportedProviderError extends SettingsStoreError {
   }
 }
 
-export class DocumentNotFoundError extends SettingsStoreError {
-  constructor(key: string) {
-    super(`Document not found: ${key}`, 'DOCUMENT_NOT_FOUND');
-    this.name = 'DocumentNotFoundError';
+export class AuthRequiredError extends SettingsStoreError {
+  constructor(provider: string) {
+    super(`Authentication required for ${provider}`, 'AUTH_REQUIRED');
+    this.name = 'AuthRequiredError';
+  }
+}
+
+/**
+ * A token-endpoint transport or server failure (network error, 5xx, unexpected
+ * status): the grant itself is NOT known to be dead, so this is distinct from
+ * AuthRequiredError and must not request re-authentication. The underlying
+ * failure (network error, or an Error carrying the HTTP status and body
+ * excerpt) is chained as cause.
+ */
+export class AuthExchangeError extends SettingsStoreError {
+  constructor(provider: string, cause?: unknown) {
+    super(`Token exchange failed for ${provider}`, 'AUTH_EXCHANGE', cause);
+    this.name = 'AuthExchangeError';
   }
 }
 
@@ -35,13 +49,6 @@ export class ConflictError extends SettingsStoreError {
   constructor(public readonly key: string) {
     super(`Revision conflict for: ${key}`, 'CONFLICT');
     this.name = 'ConflictError';
-  }
-}
-
-export class AuthRequiredError extends SettingsStoreError {
-  constructor(provider: string) {
-    super(`Authentication required for ${provider}`, 'AUTH_REQUIRED');
-    this.name = 'AuthRequiredError';
   }
 }
 

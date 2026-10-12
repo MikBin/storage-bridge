@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { DropboxProvider } from '../dropbox-provider.js';
 import { createDropboxApiMock } from './dropbox-api-mock.js';
 import type { OAuthClient, OAuthTokens } from '@storage-bridge/auth-web';
-import { ConflictError, AuthRequiredError } from '@storage-bridge/core';
+import { ConflictError, AuthRequiredError, SettingsStoreError } from '@storage-bridge/core';
 
 const noopFetch = (() => Promise.resolve(new Response())) as unknown as typeof fetch;
 
@@ -58,20 +58,12 @@ describe('DropboxProvider', () => {
       expect(logoutCalled).toBe(true);
     });
 
-    it('isConnected returns true when tokens exist', async () => {
+    it('isConnected reflects the connect/disconnect flag (02-06 uniform pre-connect policy)', async () => {
       const { provider } = createProvider();
+      expect(await provider.isConnected()).toBe(false);
+      await provider.connect();
       expect(await provider.isConnected()).toBe(true);
-    });
-
-    it('isConnected returns false when tokens are null', async () => {
-      const auth: OAuthClient = {
-        login: async () => {},
-        logout: async () => {},
-        getAccessToken: async () => { throw new Error('no tokens'); },
-        getTokens: async () => null,
-        getAuthHeaders: async () => ({ Authorization: 'Bearer token' }),
-      };
-      const provider = new DropboxProvider({ auth, fetchFn: noopFetch });
+      await provider.disconnect();
       expect(await provider.isConnected()).toBe(false);
     });
 
@@ -310,6 +302,44 @@ describe('DropboxProvider', () => {
       const { provider } = createProvider();
       const result = await provider.readFile('nonexistent.json');
       expect(result).toBeNull();
+    });
+
+    describe('corrupt metadata header (02-06)', () => {
+      // bypass: fast-check not installed; deterministic corrupt-header corpus.
+      // A non-JSON or wrong-shape Dropbox-API-Result header must reject with a
+      // coded SettingsStoreError chaining the underlying failure — never a raw
+      // SyntaxError escaping the provider boundary.
+      const CORRUPT_HEADERS: ReadonlyArray<{ label: string; header: string }> = [
+        { label: 'non-JSON text', header: 'not-json{' },
+        { label: 'a JSON array', header: '[1,2,3]' },
+      ];
+
+      function providerWithResultHeader(header: string): DropboxProvider {
+        const corruptFetch = (async () =>
+          new Response('{"data":true}', {
+            status: 200,
+            headers: { 'Dropbox-API-Result': header },
+          })) as typeof fetch;
+        return new DropboxProvider({ auth: createFakeOAuthClient(), fetchFn: corruptFetch });
+      }
+
+      for (const { label, header } of CORRUPT_HEADERS) {
+        it(`readFile rejects with coded DROPBOX_META_CORRUPT and a chained cause for ${label}`, async () => {
+          const provider = providerWithResultHeader(header);
+
+          let error: unknown;
+          try {
+            await provider.readFile('k.json');
+          } catch (e) {
+            error = e;
+          }
+
+          expect(error).toBeInstanceOf(SettingsStoreError);
+          expect((error as SettingsStoreError).code).toBe('DROPBOX_META_CORRUPT');
+          expect(error).not.toBeInstanceOf(SyntaxError);
+          expect((error as SettingsStoreError).cause).toBeInstanceOf(Error);
+        });
+      }
     });
   });
 });

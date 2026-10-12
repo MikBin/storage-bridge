@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { FileEntry } from '../providers/file-backed-document-provider.js';
 import { FileBackedDocumentProvider } from '../providers/file-backed-document-provider.js';
+import { SettingsStoreError } from '../errors.js';
 import type { ProviderId, PutOptions, ConnectedProfile } from '../types.js';
 
 class InMemoryFileProvider extends FileBackedDocumentProvider {
@@ -69,6 +70,53 @@ describe('FileBackedDocumentProvider', () => {
       const p = createProvider();
       const result = await p.getDocument<{ x: number }>('missing');
       expect(result).toBeNull();
+    });
+  });
+
+  describe('corrupt remote payloads (02-06)', () => {
+    // bypass: fast-check not installed; deterministic corrupt-payload corpus
+    // (truncated JSON, non-JSON, wrong shape). A corrupt stored payload must
+    // reject with a coded SettingsStoreError whose cause chains the underlying
+    // parse failure — never a raw SyntaxError escaping the provider boundary.
+    const CORRUPT_PAYLOADS: ReadonlyArray<{ label: string; text: string }> = [
+      { label: 'truncated JSON', text: '{"key":"k","schemaVersion":1,"data":' },
+      { label: 'non-JSON text', text: 'not json at all' },
+      { label: 'a bare number', text: '42' },
+      { label: 'a bare string', text: '"just text"' },
+      { label: 'a JSON array', text: '[1,2,3]' },
+      { label: 'an object without data', text: '{"key":"k","schemaVersion":1}' },
+    ];
+
+    function poisonProvider(text: string): InMemoryFileProvider {
+      const p = createProvider();
+      const meta: FileEntry = { id: 'poisoned', logicalKey: 'k', name: 'k.json' };
+      p['store'].set('k.json', { text, meta });
+      return p;
+    }
+
+    for (const { label, text } of CORRUPT_PAYLOADS) {
+      it(`getDocument() rejects with coded DOCUMENT_CORRUPT and a chained cause for ${label}`, async () => {
+        const p = poisonProvider(text);
+
+        let error: unknown;
+        try {
+          await p.getDocument('k');
+        } catch (e) {
+          error = e;
+        }
+
+        expect(error).toBeInstanceOf(SettingsStoreError);
+        expect((error as SettingsStoreError).code).toBe('DOCUMENT_CORRUPT');
+        expect(error).not.toBeInstanceOf(SyntaxError);
+        expect((error as SettingsStoreError).cause).toBeInstanceOf(Error);
+      });
+    }
+
+    it('well-formed payloads are unaffected by the corruption guard (state-delta: round-trip unchanged)', async () => {
+      const p = createProvider();
+      await p.putDocument<{ x: number }>({ key: 'healthy', schemaVersion: 1, updatedAt: '', data: { x: 1 } });
+      const retrieved = await p.getDocument<{ x: number }>('healthy');
+      expect(retrieved!.data).toEqual({ x: 1 });
     });
   });
 

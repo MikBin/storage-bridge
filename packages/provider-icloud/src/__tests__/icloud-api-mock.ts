@@ -9,12 +9,17 @@ export function createCloudKitApiMock(initialState: MockCloudKitState = { record
   let state = { ...initialState, records: { ...initialState.records } };
   let listPageSize: number | null = null;
   let globalFailureStatus: number | null = null;
+  // Injected application-level failure: when set, the matching endpoint answers
+  // HTTP 200 with a result carrying this serverErrorCode (CloudKit surfaces
+  // many errors in-band rather than as HTTP statuses).
+  let operationFailure: { endpoint: 'lookup' | 'modify'; serverErrorCode: string; reason: string } | null = null;
 
   return {
     reset(newState: MockCloudKitState = { records: {}, counter: 0 }) {
       state = { ...newState, records: { ...newState.records } };
       listPageSize = null;
       globalFailureStatus = null;
+      operationFailure = null;
     },
     getState() {
       return state;
@@ -26,6 +31,14 @@ export function createCloudKitApiMock(initialState: MockCloudKitState = { record
     /** Makes every endpoint answer with HTTP `status` until cleared — emulates a server outage. */
     setGlobalFailure(status: number | null) {
       globalFailureStatus = status;
+    },
+    /**
+     * Makes the next-style matching endpoint answer HTTP 200 with an in-band
+     * serverErrorCode result — emulates CloudKit application-level errors
+     * (anything other than the NOT_FOUND/CONFLICT happy-path handling).
+     */
+    setOperationFailure(endpoint: 'lookup' | 'modify', serverErrorCode: string, reason: string) {
+      operationFailure = { endpoint, serverErrorCode, reason };
     },
     fetchFn: vi.fn(async (url: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
       const urlStr = url.toString();
@@ -41,6 +54,18 @@ export function createCloudKitApiMock(initialState: MockCloudKitState = { record
 
       if (urlStr.includes('/records/lookup')) {
         // Handle lookup
+        if (operationFailure?.endpoint === 'lookup') {
+          return new Response(
+            JSON.stringify({
+              records: [{
+                recordName: body?.records?.[0]?.recordName ?? 'unknown',
+                serverErrorCode: operationFailure.serverErrorCode,
+                reason: operationFailure.reason,
+              }],
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          );
+        }
         const records = body?.records || [];
         const results = records.map((r: { recordName: string }) => {
           const record = state.records[r.recordName];
@@ -70,6 +95,18 @@ export function createCloudKitApiMock(initialState: MockCloudKitState = { record
 
       if (urlStr.includes('/records/modify')) {
         // Handle modify (save/delete)
+        if (operationFailure?.endpoint === 'modify') {
+          return new Response(
+            JSON.stringify({
+              records: [{
+                recordName: body?.operations?.[0]?.record?.recordName ?? 'unknown',
+                serverErrorCode: operationFailure.serverErrorCode,
+                reason: operationFailure.reason,
+              }],
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          );
+        }
         const operations = body?.operations || [];
         const results = operations.map((op: any) => {
           const { operationType, record } = op;

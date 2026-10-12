@@ -33,16 +33,20 @@ describe('ICloudProvider', () => {
   });
 
   describe('Connection', () => {
-    it('connect is a no-op but works', async () => {
+    it('connect succeeds', async () => {
       await expect(provider.connect()).resolves.toBeUndefined();
     });
 
-    it('disconnect is a no-op but works', async () => {
+    it('disconnect succeeds', async () => {
       await expect(provider.disconnect()).resolves.toBeUndefined();
     });
 
-    it('isConnected is always true', async () => {
+    it('isConnected reflects the connect/disconnect flag (02-06 uniform pre-connect policy)', async () => {
+      expect(await provider.isConnected()).toBe(false);
+      await provider.connect();
       expect(await provider.isConnected()).toBe(true);
+      await provider.disconnect();
+      expect(await provider.isConnected()).toBe(false);
     });
 
     it('getProfile returns mock data', async () => {
@@ -58,6 +62,7 @@ describe('ICloudProvider', () => {
 
   describe('Record operations', () => {
     it('can get, save, and list records using RecordBackedDocumentProvider methods', async () => {
+      await provider.connect();
       // Create record
       const doc = await provider.putDocument({
         key: 'settings',
@@ -101,6 +106,7 @@ describe('ICloudProvider', () => {
     }
 
     it('plain putDocument on an existing record does not send an implicit changeTag', async () => {
+      await provider.connect();
       const first = await provider.putDocument({ key: 'tag-prov', schemaVersion: 1, updatedAt: '', data: { v: 1 } });
 
       // Simulate the legacy manager envelope: the document carries its own
@@ -128,6 +134,7 @@ describe('ICloudProvider', () => {
     });
 
     it('explicit expectedRevision is sent as the recordChangeTag', async () => {
+      await provider.connect();
       const first = await provider.putDocument({ key: 'tag-explicit', schemaVersion: 1, updatedAt: '', data: { v: 1 } });
 
       await provider.putDocument(
@@ -141,6 +148,7 @@ describe('ICloudProvider', () => {
     });
 
     it('expectedRevision against a missing record rejects with ConflictError instead of silently creating', async () => {
+      await provider.connect();
       await expect(
         provider.putDocument(
           { key: 'ghost-record', schemaVersion: 1, updatedAt: '', data: { v: 1 } },

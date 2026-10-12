@@ -1,4 +1,4 @@
-import { ConflictError } from '../errors.js';
+import { ConflictError, NotConnectedError } from '../errors.js';
 import type {
   DocumentStoreProvider,
   ProviderId,
@@ -28,7 +28,20 @@ export abstract class RecordBackedDocumentProvider implements DocumentStoreProvi
   protected abstract removeRecord(key: string): Promise<void>;
   protected abstract listRecords(): Promise<CloudRecord[]>;
 
+  /**
+   * Uniform pre-connect policy (02-06): every data operation rejects with
+   * NotConnectedError before connect(), based on the provider's honest
+   * isConnected() answer — never with a fabricated success or a raw
+   * transport error.
+   */
+  private async ensureConnected(): Promise<void> {
+    if (!(await this.isConnected())) {
+      throw new NotConnectedError();
+    }
+  }
+
   async getDocument<T>(key: string): Promise<SettingsEnvelope<T> | null> {
+    await this.ensureConnected();
     const record = await this.getRecord(key);
     if (!record) return null;
     return {
@@ -41,6 +54,7 @@ export abstract class RecordBackedDocumentProvider implements DocumentStoreProvi
   }
 
   async putDocument<T>(doc: SettingsEnvelope<T>, options?: PutOptions): Promise<SettingsEnvelope<T>> {
+    await this.ensureConnected();
     // D2: the changeTag precondition comes ONLY from explicit caller
     // expectations — never from the document's own revision, which caused
     // spurious conflicts on plain puts. `force` opts out entirely.
@@ -77,10 +91,12 @@ export abstract class RecordBackedDocumentProvider implements DocumentStoreProvi
   }
 
   async deleteDocument(key: string): Promise<void> {
+    await this.ensureConnected();
     await this.removeRecord(key);
   }
 
   async listDocuments(): Promise<SettingsSummary[]> {
+    await this.ensureConnected();
     const records = await this.listRecords();
     return records.map(r => ({
       key: r.recordName,

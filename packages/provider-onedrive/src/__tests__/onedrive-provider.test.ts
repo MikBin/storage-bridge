@@ -56,20 +56,12 @@ describe('OneDriveProvider', () => {
       expect(logoutCalled).toBe(true);
     });
 
-    it('isConnected returns true when tokens exist', async () => {
+    it('isConnected reflects the connect/disconnect flag (02-06 uniform pre-connect policy)', async () => {
       const { provider } = createProvider();
+      expect(await provider.isConnected()).toBe(false);
+      await provider.connect();
       expect(await provider.isConnected()).toBe(true);
-    });
-
-    it('isConnected returns false when tokens are null', async () => {
-      const auth: OAuthClient = {
-        login: async () => {},
-        logout: async () => {},
-        getAccessToken: async () => { throw new Error('no tokens'); },
-        getTokens: async () => null,
-        getAuthHeaders: async () => ({ Authorization: 'Bearer token' }),
-      };
-      const provider = new OneDriveProvider({ auth, fetchFn: (() => {}) as unknown as typeof fetch });
+      await provider.disconnect();
       expect(await provider.isConnected()).toBe(false);
     });
 

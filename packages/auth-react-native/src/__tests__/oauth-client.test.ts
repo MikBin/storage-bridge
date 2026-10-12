@@ -162,4 +162,172 @@ describe('ReactNativeOAuthClient', () => {
       expect(mockTokenStore.remove).toHaveBeenCalledWith('google-drive');
     });
   });
+
+  describe('token-endpoint failure distinction (02-06)', () => {
+    // bypass: fast-check not installed; deterministic token-endpoint case
+    // matrix (network error / 500 / 400 invalid_grant / 401) across the login
+    // and refresh exchange paths. Transport and 5xx failures must be
+    // distinguishable from genuine auth rejections: only the latter may
+    // request re-authentication.
+    const NETWORK_ERROR = new TypeError('network request failed');
+
+    function successPrompt(): void {
+      mockPromptAsync.mockResolvedValueOnce({
+        type: 'success',
+        params: { code: 'native-auth-code', state: 'some-state' },
+      });
+    }
+
+    function successTokenResponse(): void {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          access_token: 'native-access',
+          refresh_token: 'native-refresh',
+          expires_in: 3600,
+          token_type: 'Bearer',
+        }),
+      });
+    }
+
+    async function captureRejection(operation: Promise<unknown>): Promise<unknown> {
+      try {
+        await operation;
+      } catch (error) {
+        return error;
+      }
+      throw new Error('Expected the operation to reject, but it resolved');
+    }
+
+    async function coreErrors() {
+      const core = await import('@storage-bridge/core');
+      expect(core.AuthExchangeError).toBeTypeOf('function');
+      return core;
+    }
+
+    function seedRefreshableTokens(): void {
+      mockTokenStore.get.mockResolvedValue({
+        accessToken: 'expired-token',
+        refreshToken: 'refresh-123',
+        expiresAt: Date.now() + 10_000,
+        tokenType: 'Bearer',
+      });
+    }
+
+    describe('transport failure (network error)', () => {
+      it('login() rejects with AuthExchangeError chaining the network error', async () => {
+        successPrompt();
+        mockFetch.mockRejectedValueOnce(NETWORK_ERROR);
+
+        const error = await captureRejection(client.login());
+        const { AuthExchangeError } = await coreErrors();
+
+        expect(error).toBeInstanceOf(AuthExchangeError);
+        expect((error as { cause?: unknown }).cause).toBe(NETWORK_ERROR);
+      });
+
+      it('refreshTokens() rejects with AuthExchangeError and preserves stored tokens', async () => {
+        seedRefreshableTokens();
+        mockFetch.mockRejectedValueOnce(NETWORK_ERROR);
+
+        const error = await captureRejection(client.getAccessToken());
+        const { AuthExchangeError } = await coreErrors();
+
+        expect(error).toBeInstanceOf(AuthExchangeError);
+        expect((error as { cause?: unknown }).cause).toBe(NETWORK_ERROR);
+        expect(mockTokenStore.remove).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('server failure (HTTP 500)', () => {
+      it('login() rejects with AuthExchangeError whose cause carries status and body excerpt', async () => {
+        successPrompt();
+        mockFetch.mockResolvedValueOnce({
+          ok: false,
+          status: 500,
+          text: async () => '{"error":"temporarily_unavailable","detail":"upstream down"}',
+        });
+
+        const error = await captureRejection(client.login());
+        const { AuthExchangeError } = await coreErrors();
+
+        expect(error).toBeInstanceOf(AuthExchangeError);
+        const causeMessage = String((error as { cause?: { message?: string } }).cause?.message);
+        expect(causeMessage).toContain('500');
+        expect(causeMessage).toContain('upstream down');
+      });
+
+      it('refreshTokens() rejects with AuthExchangeError and preserves stored tokens', async () => {
+        seedRefreshableTokens();
+        mockFetch.mockResolvedValueOnce({
+          ok: false,
+          status: 500,
+          text: async () => '{"error":"server_error"}',
+        });
+
+        const error = await captureRejection(client.getAccessToken());
+        const { AuthExchangeError } = await coreErrors();
+
+        expect(error).toBeInstanceOf(AuthExchangeError);
+        expect(mockTokenStore.remove).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('genuine auth rejection', () => {
+      it('login() with 400 invalid_grant rejects with AuthRequiredError', async () => {
+        successPrompt();
+        mockFetch.mockResolvedValueOnce({
+          ok: false,
+          status: 400,
+          text: async () => '{"error":"invalid_grant","error_description":"Code was already redeemed."}',
+        });
+
+        const error = await captureRejection(client.login());
+        expect(error).toBeInstanceOf(AuthRequiredError);
+      });
+
+      it('refreshTokens() with 400 invalid_grant clears tokens and rejects with AuthRequiredError', async () => {
+        seedRefreshableTokens();
+        mockFetch.mockResolvedValueOnce({
+          ok: false,
+          status: 400,
+          text: async () => '{"error":"invalid_grant","error_description":"Refresh token expired"}',
+        });
+
+        const error = await captureRejection(client.getAccessToken());
+        expect(error).toBeInstanceOf(AuthRequiredError);
+        expect(mockTokenStore.remove).toHaveBeenCalledWith('google-drive');
+      });
+
+      it('refreshTokens() with 401 clears tokens and rejects with AuthRequiredError', async () => {
+        seedRefreshableTokens();
+        mockFetch.mockResolvedValueOnce({
+          ok: false,
+          status: 401,
+          text: async () => '{"error":"invalid_client"}',
+        });
+
+        const error = await captureRejection(client.getAccessToken());
+        expect(error).toBeInstanceOf(AuthRequiredError);
+        expect(mockTokenStore.remove).toHaveBeenCalledWith('google-drive');
+      });
+    });
+
+    it('200 responses still exchange successfully on both paths (state-delta: happy path unchanged)', async () => {
+      successPrompt();
+      successTokenResponse();
+      await client.login();
+      expect(mockTokenStore.set).toHaveBeenCalledWith(
+        'google-drive',
+        expect.objectContaining({ accessToken: 'native-access' }),
+      );
+
+      seedRefreshableTokens();
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ access_token: 'refreshed-native-token', expires_in: 3600, token_type: 'Bearer' }),
+      });
+      await expect(client.getAccessToken()).resolves.toBe('refreshed-native-token');
+    });
+  });
 });

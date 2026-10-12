@@ -32,6 +32,12 @@ export class GoogleDriveProvider extends FileBackedDocumentProvider {
 
   private readonly auth: OAuthClient;
   private readonly fetchFn: typeof fetch;
+  /**
+   * Minimal connection flag (02-06 uniform pre-connect policy): data ops
+   * before connect() reject NotConnectedError instead of leaking a raw 401.
+   * Lifecycle truth (token-derived state) is step 02-08's concern.
+   */
+  private connected = false;
 
   constructor(options: GoogleDriveProviderOptions) {
     super();
@@ -41,14 +47,16 @@ export class GoogleDriveProvider extends FileBackedDocumentProvider {
 
   async connect(): Promise<void> {
     await this.auth.login();
+    this.connected = true;
   }
 
   async disconnect(): Promise<void> {
     await this.auth.logout();
+    this.connected = false;
   }
 
   async isConnected(): Promise<boolean> {
-    return !!(await this.auth.getTokens());
+    return this.connected;
   }
 
   async getProfile() {
